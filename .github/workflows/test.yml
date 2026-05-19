@@ -30,7 +30,7 @@ jobs:
       SECRET_KEY: test-secret-key
       GOOGLE_CLIENT_ID: test
       GOOGLE_CLIENT_SECRET: test
-      ANTHROPIC_API_KEY: test
+      GEMINI_API_KEY: test
       DEV_MODE: "true"
 
     steps:
