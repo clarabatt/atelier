@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
 
     frontend_url: str = "http://localhost:5173"
+    mobile_redirect_uri: str = ""
+    # Comma-separated extra CORS origins (e.g. Expo web dev server)
+    extra_origins: str = "http://localhost:8081,http://localhost:19006"
     dev_mode: bool = False
 
 

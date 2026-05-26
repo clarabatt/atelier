@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import jwt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlmodel import Session, select
 
 from backend.config import settings
@@ -29,13 +29,24 @@ def decode_session_token(token: str) -> str:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
 
 
+def _extract_token(
+    session: Optional[str],
+    authorization: Optional[str],
+) -> Optional[str]:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer "):]
+    return session
+
+
 def get_current_user(
-    session: str = Cookie(default=None, alias="session"),
+    session: Optional[str] = Cookie(default=None, alias="session"),
+    authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_session),
 ) -> User:
-    if not session:
+    token = _extract_token(session, authorization)
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    user_id = decode_session_token(session)
+    user_id = decode_session_token(token)
     user = db.get(User, user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
@@ -44,11 +55,13 @@ def get_current_user(
 
 def get_optional_user(
     session: Optional[str] = Cookie(default=None, alias="session"),
+    authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_session),
 ) -> Optional[User]:
-    if not session:
+    token = _extract_token(session, authorization)
+    if not token:
         return None
     try:
-        return get_current_user(session=session, db=db)
+        return get_current_user(session=session, authorization=authorization, db=db)
     except HTTPException:
         return None
