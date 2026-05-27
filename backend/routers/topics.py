@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from backend.auth import get_current_user
-from backend.database.models import User
+from backend.database.models import Topic, User
 from backend.database.repositories import TopicRepository, TopicStatsRepository
 from backend.database.session import get_session
+from backend.schemas.topics import NewTopicRequest
 
 router = APIRouter()
 
@@ -36,3 +37,22 @@ async def list_topics(
         )
 
     return {"topics": result}
+
+
+@router.post("", status_code=201)
+async def create_topic(
+    body: NewTopicRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    topic = Topic(user_id=user.id, title=body.title, domain=body.domain)
+    topic = TopicRepository(db).add(topic)
+    return {
+        "topic": {
+            "id": str(topic.id),
+            "title": topic.title,
+            "domain": topic.domain,
+            "ai_level_summary": topic.ai_level_summary,
+            "created_at": topic.created_at.isoformat(),
+        }
+    }

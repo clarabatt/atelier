@@ -82,8 +82,14 @@ export default function TopicsScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      <View className="px-6 pt-16 pb-4">
+      <View className="px-6 pt-16 pb-4 flex-row items-center justify-between">
         <Text className="text-3xl font-bold text-slate-900">Topics</Text>
+        <Pressable
+          className="bg-indigo-600 rounded-xl px-4 py-2 active:bg-indigo-700"
+          onPress={() => router.push('/topics/new')}
+        >
+          <Text className="text-white text-sm font-semibold">+ New topic</Text>
+        </Pressable>
       </View>
 
       {loading ? (
