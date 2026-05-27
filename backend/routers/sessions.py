@@ -15,7 +15,8 @@ from backend.database.repositories import (
     TopicStatsRepository,
 )
 from backend.database.session import get_session
-from backend.schemas.sessions import AttemptRequest, StartSessionRequest
+from backend.ai.grader import grade_written
+from backend.schemas.sessions import AttemptRequest, GradeRequest, StartSessionRequest
 
 router = APIRouter()
 
@@ -126,6 +127,57 @@ async def complete_session(
         "wrong": session_obj.wrong_count,
         "skipped": session_obj.skipped_count,
         "accuracy_pct": round(session_obj.correct_count / max(total, 1) * 100),
+    }
+
+
+@router.post("/{session_id}/grade")
+async def grade_written_answer(
+    session_id: uuid.UUID,
+    body: GradeRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    session_obj = StudySessionRepository(db).get_by_id(session_id)
+    if not session_obj or session_obj.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session_obj.ended_at:
+        raise HTTPException(status_code=400, detail="Session already completed")
+
+    existing = AttemptRepository(db).get_by_session_and_question(session_id, body.question_id)
+    if existing:
+        return {
+            "attempt_id": str(existing.id),
+            "verdict": existing.status.value,
+            "explanation": "",
+        }
+
+    question = QuestionRepository(db).get_by_id(body.question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    result = grade_written(question.body, question.correct_answer, body.user_answer)
+    verdict = result["verdict"]
+
+    attempt_status = AttemptStatus.correct if verdict == "correct" else AttemptStatus.wrong
+    attempt = Attempt(
+        user_id=user.id,
+        question_id=body.question_id,
+        session_id=session_id,
+        user_answer=body.user_answer,
+        status=attempt_status,
+    )
+    AttemptRepository(db).add(attempt)
+
+    if attempt_status == AttemptStatus.correct:
+        session_obj.correct_count += 1
+    else:
+        session_obj.wrong_count += 1
+    StudySessionRepository(db).update(session_obj)
+
+    return {
+        "attempt_id": str(attempt.id),
+        "verdict": verdict,
+        "explanation": result["explanation"],
     }
 
 
