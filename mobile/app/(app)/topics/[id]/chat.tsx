@@ -109,16 +109,16 @@ export default function DiagnosticChatScreen() {
           <View className="mt-4 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 items-center gap-3">
             <Text className="text-3xl">✅</Text>
             <Text className="text-base font-bold text-slate-900 text-center">
-              We're ready — generating your first batch
+              Diagnostic complete
             </Text>
             <Text className="text-sm text-slate-500 text-center leading-relaxed">
-              Your personalised exercises will be ready shortly.
+              Your first batch of questions is ready.
             </Text>
             <Pressable
               className="bg-indigo-600 rounded-xl px-6 py-3 mt-1 active:bg-indigo-700"
-              onPress={() => router.navigate('/topics')}
+              onPress={() => router.replace(`/topics/${topicId}`)}
             >
-              <Text className="text-white font-semibold text-sm">Go to my topics</Text>
+              <Text className="text-white font-semibold text-sm">Start practising</Text>
             </Pressable>
           </View>
         )}

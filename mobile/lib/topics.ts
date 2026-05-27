@@ -19,9 +19,14 @@ export interface TopicDetail {
   title: string;
   domain: string;
   ai_level_summary: string | null;
+  has_batch: boolean;
   accuracy_pct: number;
   last_activity_at: string | null;
   created_at: string;
+}
+
+export async function generateBatch(topicId: string): Promise<void> {
+  await api.post(`/api/topics/${topicId}/batches`);
 }
 
 export async function fetchTopic(id: string): Promise<TopicDetail> {
