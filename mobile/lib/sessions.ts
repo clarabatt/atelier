@@ -48,3 +48,21 @@ export async function completeSession(sessionId: string): Promise<SessionResult>
   const { data } = await api.post<SessionResult>(`/api/sessions/${sessionId}/complete`);
   return data;
 }
+
+export interface GradeResult {
+  attempt_id: string;
+  verdict: 'correct' | 'partial' | 'wrong';
+  explanation: string;
+}
+
+export async function gradeAnswer(
+  sessionId: string,
+  questionId: string,
+  userAnswer: string,
+): Promise<GradeResult> {
+  const { data } = await api.post<GradeResult>(`/api/sessions/${sessionId}/grade`, {
+    question_id: questionId,
+    user_answer: userAnswer,
+  });
+  return data;
+}

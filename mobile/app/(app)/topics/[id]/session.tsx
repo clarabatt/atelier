@@ -14,6 +14,8 @@ import {
   startSession,
   recordAttempt,
   completeSession,
+  gradeAnswer,
+  type GradeResult,
   type SessionQuestion,
   type SessionResult,
 } from '@/lib/sessions';
@@ -38,6 +40,8 @@ export default function SessionScreen() {
   const [textAnswer, setTextAnswer] = useState('');
   const [results, setResults] = useState<SessionResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
+  const [gradeError, setGradeError] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -66,18 +70,19 @@ export default function SessionScreen() {
     setPhase('reveal');
   }
 
-  async function handleWrittenCheck() {
-    setPhase('reveal');
-  }
-
-  async function handleSelfAssess(status: 'correct' | 'wrong') {
-    if (!sessionId || !question || submitting) return;
+  async function handleWrittenSubmit() {
+    if (!sessionId || !question || submitting || !textAnswer.trim()) return;
     setSubmitting(true);
+    setGradeError(false);
     try {
-      await recordAttempt(sessionId, question.id, textAnswer, status);
-    } catch { /* best effort */ }
-    setSubmitting(false);
-    await advance();
+      const result = await gradeAnswer(sessionId, question.id, textAnswer.trim());
+      setGradeResult(result);
+      setPhase('reveal');
+    } catch {
+      setGradeError(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function advance() {
@@ -91,6 +96,8 @@ export default function SessionScreen() {
       setCurrentIdx((i) => i + 1);
       setSelectedOption(null);
       setTextAnswer('');
+      setGradeResult(null);
+      setGradeError(false);
       setPhase('question');
     }
   }
@@ -229,8 +236,41 @@ export default function SessionScreen() {
           />
         )}
 
-        {/* Correct answer reveal (written/fill_blank) */}
-        {phase === 'reveal' && question.format !== 'mcq' && (
+        {/* Grade error toast */}
+        {gradeError && (
+          <View className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4">
+            <Text className="text-red-700 text-sm text-center">
+              Grading failed. Please try again.
+            </Text>
+          </View>
+        )}
+
+        {/* AI grade result (written questions) */}
+        {phase === 'reveal' && question.format === 'written' && gradeResult && (
+          <View
+            className={`border rounded-2xl p-4 mb-4 ${
+              gradeResult.verdict === 'correct'
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-red-50 border-red-200'
+            }`}
+          >
+            <Text
+              className={`text-xs font-semibold uppercase tracking-wide mb-1 ${
+                gradeResult.verdict === 'correct' ? 'text-emerald-600' : 'text-red-600'
+              }`}
+            >
+              {gradeResult.verdict === 'correct' ? '✓ Correct' : gradeResult.verdict === 'partial' ? '~ Partial' : '✗ Wrong'}
+            </Text>
+            <Text className={`text-sm mb-2 ${gradeResult.verdict === 'correct' ? 'text-emerald-800' : 'text-red-800'}`}>
+              {gradeResult.explanation}
+            </Text>
+            <Text className="text-xs font-semibold text-slate-500 mb-1">Correct answer</Text>
+            <Text className="text-sm text-slate-700">{question.correct_answer}</Text>
+          </View>
+        )}
+
+        {/* Correct answer reveal (fill_blank) */}
+        {phase === 'reveal' && question.format === 'fill_blank' && (
           <View className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-4">
             <Text className="text-xs font-semibold text-emerald-600 mb-1">Correct answer</Text>
             <Text className="text-sm text-emerald-800">{question.correct_answer}</Text>
@@ -238,16 +278,30 @@ export default function SessionScreen() {
         )}
 
         {/* Action buttons */}
-        {phase === 'question' && question.format !== 'mcq' && (
+        {phase === 'question' && question.format === 'written' && (
+          <Pressable
+            className="bg-indigo-600 rounded-2xl py-4 items-center active:bg-indigo-700 disabled:opacity-50"
+            onPress={handleWrittenSubmit}
+            disabled={submitting || !textAnswer.trim()}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text className="text-white font-semibold">Submit for grading</Text>
+            )}
+          </Pressable>
+        )}
+
+        {phase === 'question' && question.format === 'fill_blank' && (
           <Pressable
             className="bg-indigo-600 rounded-2xl py-4 items-center active:bg-indigo-700"
-            onPress={handleWrittenCheck}
+            onPress={() => setPhase('reveal')}
           >
             <Text className="text-white font-semibold">Check answer</Text>
           </Pressable>
         )}
 
-        {phase === 'reveal' && question.format === 'mcq' && (
+        {phase === 'reveal' && (question.format === 'mcq' || question.format === 'fill_blank' || gradeResult) && (
           <Pressable
             className="bg-indigo-600 rounded-2xl py-4 items-center mt-2 active:bg-indigo-700"
             onPress={advance}
@@ -257,25 +311,6 @@ export default function SessionScreen() {
               {isLastQuestion ? 'Finish' : 'Next →'}
             </Text>
           </Pressable>
-        )}
-
-        {phase === 'reveal' && question.format !== 'mcq' && (
-          <View className="flex-row gap-3">
-            <Pressable
-              className="flex-1 bg-emerald-50 border border-emerald-300 rounded-2xl py-4 items-center active:bg-emerald-100"
-              onPress={() => handleSelfAssess('correct')}
-              disabled={submitting}
-            >
-              <Text className="text-emerald-700 font-semibold text-sm">✓  Got it</Text>
-            </Pressable>
-            <Pressable
-              className="flex-1 bg-red-50 border border-red-300 rounded-2xl py-4 items-center active:bg-red-100"
-              onPress={() => handleSelfAssess('wrong')}
-              disabled={submitting}
-            >
-              <Text className="text-red-700 font-semibold text-sm">✗  Missed it</Text>
-            </Pressable>
-          </View>
         )}
       </ScrollView>
     </KeyboardAvoidingView>

@@ -1,11 +1,13 @@
 import uuid
 from datetime import datetime
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from backend.database.models import Attempt, AttemptStatus, TopicStats
+from backend.database.models import Attempt, AttemptStatus, QuestionFormat, TopicStats
 from backend.database.repositories import (
+    AttemptRepository,
     BatchRepository,
     StudySessionRepository,
     TopicStatsRepository,
@@ -278,3 +280,129 @@ def test_complete_session_updates_existing_stats(client: TestClient, session: Se
     stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
     assert stats.total_answered == 20
     assert stats.accuracy_pct == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Grade written answer (AT-017)
+# ---------------------------------------------------------------------------
+
+def _grade_patch(verdict: str, explanation: str = "Test explanation."):
+    return patch(
+        "backend.routers.sessions.grade_written",
+        return_value={"verdict": verdict, "explanation": explanation},
+    )
+
+
+def _setup_written(session: Session):
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    question = QuestionFactory.create(session, batch.id, format=QuestionFormat.written, options=None)
+    study_session = StudySessionFactory.create(session, user.id, batch.id)
+    return user, question, study_session
+
+
+def test_grade_written_correct_records_attempt(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup_written(session)
+    with _grade_patch("correct"):
+        r = client.post(
+            f"/api/sessions/{study_session.id}/grade",
+            json={"question_id": str(question.id), "user_answer": "A named memory location"},
+            headers=_auth(session_cookie, user.id),
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert uuid.UUID(body["attempt_id"])
+    assert body["verdict"] == "correct"
+    assert body["explanation"] == "Test explanation."
+
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted.correct_count == 1
+    assert persisted.wrong_count == 0
+
+
+def test_grade_written_partial_recorded_as_wrong(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup_written(session)
+    with _grade_patch("partial"):
+        r = client.post(
+            f"/api/sessions/{study_session.id}/grade",
+            json={"question_id": str(question.id), "user_answer": "incomplete answer"},
+            headers=_auth(session_cookie, user.id),
+        )
+    assert r.status_code == 200
+    assert r.json()["verdict"] == "partial"
+
+    persisted_attempt = AttemptRepository(session).get_by_session_and_question(study_session.id, question.id)
+    assert persisted_attempt.status == AttemptStatus.wrong
+
+    persisted_session = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted_session.wrong_count == 1
+    assert persisted_session.correct_count == 0
+
+
+def test_grade_written_wrong_records_attempt(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup_written(session)
+    with _grade_patch("wrong"):
+        r = client.post(
+            f"/api/sessions/{study_session.id}/grade",
+            json={"question_id": str(question.id), "user_answer": "wrong answer"},
+            headers=_auth(session_cookie, user.id),
+        )
+    assert r.status_code == 200
+    assert r.json()["verdict"] == "wrong"
+
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted.wrong_count == 1
+
+
+def test_grade_session_not_found(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    with _grade_patch("correct"):
+        r = client.post(
+            f"/api/sessions/{uuid.uuid4()}/grade",
+            json={"question_id": str(uuid.uuid4()), "user_answer": "answer"},
+            headers=_auth(session_cookie, user.id),
+        )
+    assert r.status_code == 404
+
+
+def test_grade_session_completed_rejected(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, _ = _setup_written(session)
+    batch = BatchFactory.create(session, TopicFactory.create(session, user.id).id)
+    completed = StudySessionFactory.create(session, user.id, batch.id, ended_at=datetime.utcnow())
+
+    with _grade_patch("correct"):
+        r = client.post(
+            f"/api/sessions/{completed.id}/grade",
+            json={"question_id": str(question.id), "user_answer": "answer"},
+            headers=_auth(session_cookie, user.id),
+        )
+    assert r.status_code == 400
+
+
+def test_grade_wrong_user_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup_written(session)
+    other_user = UserFactory.create(session)
+    with _grade_patch("correct"):
+        r = client.post(
+            f"/api/sessions/{study_session.id}/grade",
+            json={"question_id": str(question.id), "user_answer": "answer"},
+            headers=_auth(session_cookie, other_user.id),
+        )
+    assert r.status_code == 404
+
+
+def test_grade_duplicate_returns_existing_attempt(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup_written(session)
+    headers = _auth(session_cookie, user.id)
+    payload = {"question_id": str(question.id), "user_answer": "same answer"}
+
+    with _grade_patch("correct"):
+        r1 = client.post(f"/api/sessions/{study_session.id}/grade", json=payload, headers=headers)
+        r2 = client.post(f"/api/sessions/{study_session.id}/grade", json=payload, headers=headers)
+
+    assert r2.status_code == 200
+    assert r1.json()["attempt_id"] == r2.json()["attempt_id"]
+
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted.correct_count == 1

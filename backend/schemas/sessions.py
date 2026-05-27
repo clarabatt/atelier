@@ -12,3 +12,8 @@ class AttemptRequest(BaseModel):
     question_id: uuid.UUID
     user_answer: str
     status: Literal["correct", "wrong", "skipped"]
+
+
+class GradeRequest(BaseModel):
+    question_id: uuid.UUID
+    user_answer: str
