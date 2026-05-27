@@ -21,6 +21,10 @@ export async function archiveTopic(id: string, status: 'active' | 'archived'): P
   await api.patch(`/api/topics/${id}`, { status });
 }
 
+export async function deleteTopic(id: string): Promise<void> {
+  await api.delete(`/api/topics/${id}`);
+}
+
 export interface TopicDetail {
   id: string;
   title: string;

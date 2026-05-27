@@ -130,6 +130,36 @@ async def patch_topic(
     return {"id": str(topic.id), "status": topic.status}
 
 
+@router.delete("/{topic_id}", status_code=204)
+async def delete_topic(
+    topic_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    topic = TopicRepository(db).get_by_user_and_id(user.id, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    batches = BatchRepository(db).list_by_topic(topic_id)
+    for batch in batches:
+        sessions = StudySessionRepository(db).list_by_batch(batch.id)
+        for sess in sessions:
+            for attempt in AttemptRepository(db).list_by_session(sess.id):
+                db.delete(attempt)
+        for question in QuestionRepository(db).list_by_batch(batch.id):
+            db.delete(question)
+        for sess in sessions:
+            db.delete(sess)
+        db.delete(batch)
+
+    stats = TopicStatsRepository(db).get_by_user_and_topic(user.id, topic_id)
+    if stats:
+        db.delete(stats)
+
+    db.delete(topic)
+    db.commit()
+
+
 @router.post("/{topic_id}/batches", status_code=201)
 async def create_batch(
     topic_id: uuid.UUID,
