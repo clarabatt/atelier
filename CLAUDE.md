@@ -77,3 +77,79 @@ For EVERY implementation or feature request, you MUST follow this loop without b
 3. **Draft the Tests:** Write the actual test code (Pytest).
 4. **The Gate:** Pause and say: "The test plan and code are ready. Please approve or suggest changes before I write the implementation."
 5. **Implement:** ONLY proceed to writing the feature code after I give the 'GO'.
+
+---
+
+# Mobile Frontend Rules (React Native + Expo)
+
+The mobile app lives in `mobile/`. These rules apply to all work under that directory.
+
+## Tech Stack
+
+- **Framework:** React Native 0.85 + Expo ~56 (cross-platform: iOS, Android, Web)
+- **Routing:** Expo Router (file-based, same mental model as Next.js)
+- **State:** Zustand for global state; `useState` for transient UI state
+- **Styling:** NativeWind (Tailwind utility classes on RN components)
+- **HTTP:** Axios via `mobile/lib/api.ts` (auth interceptor already wired)
+- **Language:** TypeScript strict mode throughout
+
+## File Organization
+
+```
+mobile/
+  app/           ← route files only (Expo Router convention)
+  components/    ← reusable UI components
+  lib/           ← API wrappers and utilities (no UI code)
+  stores/        ← Zustand stores
+```
+
+- Route files (`app/**`) use **default exports**.
+- Everything else (components, stores, lib) uses **named exports**.
+- New API calls go in `lib/` as typed wrappers — never call `api` (Axios) directly from a component.
+
+## TypeScript
+
+- Define explicit interfaces for all API response shapes and component props.
+- Prefer `interface` over `type` for props and API types.
+- No `any`. Use `unknown` and narrow it if the shape is truly unknown.
+
+## State Management
+
+| State type | Where |
+|---|---|
+| Auth token, current user | `stores/auth.ts` (`useAuthStore`) |
+| Diagnostic session conversation | `stores/session.ts` (`useSessionStore`) |
+| Form input, loading, local toggles | Component-local `useState` |
+
+Do not add new Zustand stores unless the state is genuinely shared across multiple screens.
+
+## Styling
+
+- Use NativeWind Tailwind classes exclusively (`className="..."`).
+- No `StyleSheet.create()` except for platform-specific properties that Tailwind cannot express (e.g., shadow on Android).
+- State-driven styles use template literals: `` className={`px-4 ${active ? 'bg-indigo-600' : 'bg-white'}`} ``.
+- Follow the existing Slate/Indigo/Emerald color palette.
+
+## Routing (Expo Router)
+
+- Auth guard lives in `app/_layout.tsx` — do not add per-screen redirect logic.
+- Use route groups: `(auth)` for unauthenticated screens, `(app)` for protected screens.
+- Prefer `router.replace()` for auth transitions; `router.push()` for normal navigation.
+- Dynamic segments use `[id]` filenames; access via `useLocalSearchParams()`.
+
+## Forms & Validation
+
+- Track errors as a typed object: `useState<{ field?: string }>({})`.
+- Clear individual field errors on change, not on submit.
+- Disable the submit button and show `ActivityIndicator` during async submission.
+- Use `ref`s to advance focus between inputs on return key.
+
+## Error Handling
+
+- Every async function in `lib/` must be called inside a `try/catch` in the component.
+- Show a user-facing error message in state — never `console.error` only.
+- Provide graceful empty states (empty list, skeleton) rather than crashing.
+
+## Frontend Testing
+
+**Skip frontend tests for now.** No test infrastructure (Jest/testing-library) is set up. The Mandatory Workflow Protocol (section 7) applies to backend work only — do NOT draft test scenarios or run the gate step for mobile features.
