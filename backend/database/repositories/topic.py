@@ -14,7 +14,7 @@ class TopicRepository(BaseRepository[Topic, uuid.UUID]):
     def list_by_user(self, user_id: uuid.UUID, include_archived: bool = False) -> list[Topic]:
         q = select(Topic).where(Topic.user_id == user_id)
         if not include_archived:
-            q = q.where(Topic.status == TopicStatus.active)
+            q = q.where(Topic.status != TopicStatus.archived)
         return list(self.session.exec(q).all())
 
     def get_by_user_and_id(self, user_id: uuid.UUID, topic_id: uuid.UUID) -> Optional[Topic]:

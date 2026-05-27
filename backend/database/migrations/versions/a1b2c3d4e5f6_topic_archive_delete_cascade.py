@@ -18,12 +18,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add status column to topics
+    op.execute("CREATE TYPE topicstatus AS ENUM ('not_started', 'active', 'archived')")
     op.add_column(
         'topics',
         sa.Column(
             'status',
-            sa.Enum('active', 'archived', name='topicstatus'),
+            sa.Enum('not_started', 'active', 'archived', name='topicstatus', create_type=False),
             nullable=False,
             server_default='active',
         ),
@@ -63,6 +63,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column('topics', 'status')
+    op.execute("DROP TYPE topicstatus")
 
     # Restore FK constraints without CASCADE
     op.drop_constraint('batches_topic_id_fkey', 'batches', type_='foreignkey')

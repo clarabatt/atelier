@@ -466,3 +466,29 @@ def test_delete_topic_wrong_user_gets_404(client: TestClient, session: Session, 
     r = client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, requester.id))
     assert r.status_code == 404
     assert TopicRepository(session).get_by_id(topic.id) is not None
+
+
+# ---------------------------------------------------------------------------
+# not_started status — AT-0002
+# ---------------------------------------------------------------------------
+
+def test_new_topic_defaults_to_not_started(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    assert topic.status.value == "not_started"
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    ids = [t["id"] for t in r.json()["topics"]]
+    assert str(topic.id) in ids
+
+
+def test_batch_creation_transitions_topic_to_active(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="Beginner level")
+
+    with patch("backend.routers.topics.generate_batch", return_value=_fake_questions()):
+        client.post(f"/api/topics/{topic.id}/batches", headers=_auth(session_cookie, user.id))
+
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.status.value == "active"
