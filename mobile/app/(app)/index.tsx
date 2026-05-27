@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 
@@ -11,51 +11,20 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.greeting}>Hello, {user?.display_name ?? 'there'}!</Text>
-      <Text style={styles.email}>{user?.email}</Text>
-      <Text style={styles.placeholder}>Your study topics will appear here.</Text>
-      <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Sign out</Text>
+    <View className="flex-1 bg-slate-50 px-6 pt-20 gap-2">
+      <Text className="text-3xl font-bold text-slate-900 mb-1">
+        Hello, {user?.display_name ?? 'there'}!
+      </Text>
+      <Text className="text-sm text-slate-500 mb-6">{user?.email}</Text>
+      <Text className="text-base text-slate-400 italic">
+        Your study topics will appear here.
+      </Text>
+      <Pressable
+        className="mt-auto border border-slate-200 rounded-xl py-4 items-center active:bg-slate-100"
+        onPress={handleLogout}
+      >
+        <Text className="text-slate-500 text-base">Sign out</Text>
       </Pressable>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    paddingTop: 80,
-    backgroundColor: '#f8fafc',
-    gap: 8,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 24,
-  },
-  placeholder: {
-    fontSize: 15,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-  },
-  logoutButton: {
-    marginTop: 'auto',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-  },
-  logoutText: {
-    fontSize: 15,
-    color: '#64748b',
-  },
-});
