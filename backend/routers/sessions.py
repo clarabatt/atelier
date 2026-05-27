@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
@@ -138,12 +138,22 @@ def _update_stats(
     total = session_obj.correct_count + session_obj.wrong_count
     accuracy = round(session_obj.correct_count / max(total, 1) * 100, 1)
     now = datetime.utcnow()
+    today = now.date()
 
     stats = TopicStatsRepository(db).get_by_user_and_topic(user_id, topic_id)
     if stats:
         stats.total_answered += total
         stats.total_skipped += session_obj.skipped_count
         stats.accuracy_pct = accuracy
+        if stats.last_activity_at:
+            last_date = stats.last_activity_at.date()
+            if last_date < today - timedelta(days=1):
+                stats.streak_days = 1
+            elif last_date == today - timedelta(days=1):
+                stats.streak_days += 1
+            # last_date == today: streak unchanged
+        else:
+            stats.streak_days = 1
         stats.last_activity_at = now
         TopicStatsRepository(db).update(stats)
     else:
@@ -153,5 +163,6 @@ def _update_stats(
             accuracy_pct=accuracy,
             total_answered=total,
             total_skipped=session_obj.skipped_count,
+            streak_days=1,
             last_activity_at=now,
         ))
