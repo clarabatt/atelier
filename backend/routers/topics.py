@@ -102,7 +102,10 @@ async def diagnostic(
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    message, summary = run_diagnostic(topic.title, topic.domain, body.conversation)
+    try:
+        message, summary = run_diagnostic(topic.title, topic.domain, body.conversation)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="AI service error") from exc
 
     if summary is not None:
         topic.ai_level_summary = summary

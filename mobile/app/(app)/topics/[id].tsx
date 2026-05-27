@@ -13,7 +13,13 @@ export default function TopicDetailScreen() {
 
   useEffect(() => {
     fetchTopic(topicId)
-      .then(setTopic)
+      .then((t) => {
+        if (t.ai_level_summary === null) {
+          router.replace(`/topics/${topicId}/chat`);
+        } else {
+          setTopic(t);
+        }
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [topicId]);
