@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -278,3 +278,87 @@ def test_complete_session_updates_existing_stats(client: TestClient, session: Se
     stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
     assert stats.total_answered == 20
     assert stats.accuracy_pct == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Streak tracking (AT-024)
+# ---------------------------------------------------------------------------
+
+def test_complete_session_first_time_sets_streak_to_1(client: TestClient, session: Session, session_cookie) -> None:
+    user, _, study_session = _setup(session)
+    client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    batch = BatchRepository(session).get_by_id(study_session.batch_id)
+    stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
+    assert stats.streak_days == 1
+
+
+def test_complete_session_same_day_does_not_increment_streak(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    from backend.database.models import TopicStats as _TS
+    existing = _TS(
+        user_id=user.id,
+        topic_id=topic.id,
+        accuracy_pct=80.0,
+        total_answered=5,
+        streak_days=3,
+        last_activity_at=datetime.utcnow(),
+    )
+    session.add(existing)
+    session.commit()
+
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=4, wrong_count=1)
+    client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, topic.id)
+    assert stats.streak_days == 3
+
+
+def test_complete_session_yesterday_increments_streak(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    yesterday = datetime.utcnow() - timedelta(days=1)
+    from backend.database.models import TopicStats as _TS
+    existing = _TS(
+        user_id=user.id,
+        topic_id=topic.id,
+        accuracy_pct=80.0,
+        total_answered=5,
+        streak_days=5,
+        last_activity_at=yesterday,
+    )
+    session.add(existing)
+    session.commit()
+
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=4, wrong_count=1)
+    client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, topic.id)
+    assert stats.streak_days == 6
+
+
+def test_complete_session_gap_resets_streak(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    two_days_ago = datetime.utcnow() - timedelta(days=2)
+    from backend.database.models import TopicStats as _TS
+    existing = _TS(
+        user_id=user.id,
+        topic_id=topic.id,
+        accuracy_pct=80.0,
+        total_answered=5,
+        streak_days=10,
+        last_activity_at=two_days_ago,
+    )
+    session.add(existing)
+    session.commit()
+
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=4, wrong_count=1)
+    client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, topic.id)
+    assert stats.streak_days == 1
