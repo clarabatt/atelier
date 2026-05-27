@@ -7,6 +7,12 @@ import { useAuthStore } from '@/stores/auth';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+const FEATURES = [
+  { icon: '🧠', text: 'AI-generated questions tailored to your level' },
+  { icon: '📈', text: 'Track accuracy and streaks across topics' },
+  { icon: '✅', text: 'AI grades written answers instantly' },
+];
+
 export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const { setToken, fetchUser } = useAuthStore();
@@ -38,20 +44,51 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center bg-slate-50 px-6 gap-4">
-      <Text className="text-5xl font-bold text-slate-900 tracking-tight">Atelier</Text>
-      <Text className="text-base text-slate-500 mb-4">Your AI study companion</Text>
-      <Pressable
-        className="w-full items-center bg-blue-600 rounded-xl py-4 active:bg-blue-700"
-        onPress={handleGoogleLogin}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-white text-base font-semibold">Continue with Google</Text>
-        )}
-      </Pressable>
+    <View className="flex-1 bg-slate-50">
+      {/* Hero */}
+      <View className="flex-1 items-center justify-center px-8 gap-3">
+        <View className="w-20 h-20 bg-indigo-600 rounded-3xl items-center justify-center mb-2">
+          <Text className="text-4xl">⚒️</Text>
+        </View>
+        <Text className="text-4xl font-bold text-slate-900 tracking-tight">Atelier</Text>
+        <Text className="text-base text-slate-500 text-center">
+          The AI study workshop that builds real knowledge.
+        </Text>
+      </View>
+
+      {/* Features */}
+      <View className="px-6 mb-6 gap-3">
+        {FEATURES.map(({ icon, text }) => (
+          <View key={text} className="flex-row items-center gap-3">
+            <View className="w-9 h-9 bg-indigo-50 rounded-xl items-center justify-center">
+              <Text className="text-lg">{icon}</Text>
+            </View>
+            <Text className="text-sm text-slate-600 flex-1">{text}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* CTA */}
+      <View className="px-6 pb-12">
+        <Pressable
+          className="w-full flex-row items-center justify-center gap-3 bg-white border border-slate-200 rounded-2xl py-4 active:bg-slate-50"
+          onPress={handleGoogleLogin}
+          disabled={isLoading}
+          style={{ elevation: 1 }}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#6366f1" />
+          ) : (
+            <>
+              <Text className="text-xl leading-none">G</Text>
+              <Text className="text-slate-800 text-base font-semibold">Continue with Google</Text>
+            </>
+          )}
+        </Pressable>
+        <Text className="text-xs text-slate-400 text-center mt-3">
+          By continuing, you agree to our Terms of Service.
+        </Text>
+      </View>
     </View>
   );
 }
