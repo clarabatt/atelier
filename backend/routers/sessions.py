@@ -121,11 +121,35 @@ async def complete_session(
             _update_stats(user.id, batch.topic_id, session_obj, db)
 
     total = session_obj.correct_count + session_obj.wrong_count
+    accuracy = round(session_obj.correct_count / max(total, 1) * 100)
+    threshold_passed = total >= 20 and accuracy >= 80
+
+    ended = session_obj.ended_at or datetime.utcnow()
+    time_taken_seconds = int((ended - session_obj.started_at).total_seconds())
+
+    wrong_attempts = [
+        a for a in AttemptRepository(db).list_by_session(session_obj.id)
+        if a.status == AttemptStatus.wrong
+    ][:3]
+    weak_questions = []
+    for attempt in wrong_attempts:
+        q = QuestionRepository(db).get_by_id(attempt.question_id)
+        if q:
+            weak_questions.append({
+                "id": str(q.id),
+                "body": q.body,
+                "correct_answer": q.correct_answer,
+                "reasoning": q.reasoning,
+            })
+
     return {
         "correct": session_obj.correct_count,
         "wrong": session_obj.wrong_count,
         "skipped": session_obj.skipped_count,
-        "accuracy_pct": round(session_obj.correct_count / max(total, 1) * 100),
+        "accuracy_pct": accuracy,
+        "time_taken_seconds": time_taken_seconds,
+        "threshold_passed": threshold_passed,
+        "weak_questions": weak_questions,
     }
 
 
