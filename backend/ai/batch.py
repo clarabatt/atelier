@@ -21,7 +21,7 @@ Return a JSON array of 20 objects. Each object must have these exact keys:
 - "reasoning": one sentence explaining why it is correct (string)
 - "difficulty": integer 1–5
 
-Distribution: ~10 mcq, ~6 written, ~4 fill_blank.
+Format distribution (EXACT minimums): at least 6 mcq, at least 6 written, at least 4 fill_blank. The remaining 4 may be any format.
 Difficulty: questions 1–5 difficulty 1–2, questions 6–14 difficulty 3, questions 15–20 difficulty 4–5.
 Tailor difficulty and content to the student's level context above.
 Return only the JSON array with no other text.
