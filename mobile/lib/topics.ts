@@ -37,8 +37,18 @@ export interface NewTopic {
   created_at: string;
 }
 
-export async function createTopic(title: string, domain: string): Promise<NewTopic> {
-  const { data } = await api.post<{ topic: NewTopic }>('/api/topics', { title, domain });
+export type TopicLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export async function createTopic(
+  title: string,
+  domain: string,
+  initial_level?: TopicLevel,
+): Promise<NewTopic> {
+  const { data } = await api.post<{ topic: NewTopic }>('/api/topics', {
+    title,
+    domain,
+    ...(initial_level ? { initial_level } : {}),
+  });
   return data.topic;
 }
 

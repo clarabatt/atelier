@@ -75,7 +75,12 @@ async def create_topic(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    topic = Topic(user_id=user.id, title=body.title, domain=body.domain)
+    topic = Topic(
+        user_id=user.id,
+        title=body.title,
+        domain=body.domain,
+        ai_level_summary=body.level_summary(),
+    )
     topic = TopicRepository(db).add(topic)
     return {
         "topic": {
