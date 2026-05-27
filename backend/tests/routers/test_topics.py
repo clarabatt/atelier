@@ -316,3 +316,82 @@ def test_diagnostic_ai_error_returns_503(client: TestClient, session: Session, s
                 headers=_auth(session_cookie, user.id),
             )
     assert r.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Patch topic (archive / unarchive) — AT-027
+# ---------------------------------------------------------------------------
+
+def test_patch_topic_archive(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "archived"
+
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.status.value == "archived"
+
+
+def test_patch_topic_archived_hidden_from_default_list(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    TopicFactory.create(session, user.id, title="Active Topic")
+    archived = TopicFactory.create(session, user.id, title="Archived Topic")
+
+    client.patch(
+        f"/api/topics/{archived.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    titles = {t["title"] for t in r.json()["topics"]}
+    assert "Active Topic" in titles
+    assert "Archived Topic" not in titles
+
+
+def test_patch_topic_include_archived_returns_all(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    TopicFactory.create(session, user.id, title="Active")
+    archived = TopicFactory.create(session, user.id, title="Archived")
+
+    client.patch(
+        f"/api/topics/{archived.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    r = client.get("/api/topics?include_archived=true", headers=_auth(session_cookie, user.id))
+    titles = {t["title"] for t in r.json()["topics"]}
+    assert "Active" in titles
+    assert "Archived" in titles
+
+
+def test_patch_topic_unarchive_returns_to_list(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, title="My Topic")
+
+    client.patch(f"/api/topics/{topic.id}", json={"status": "archived"}, headers=_auth(session_cookie, user.id))
+    client.patch(f"/api/topics/{topic.id}", json={"status": "active"}, headers=_auth(session_cookie, user.id))
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    titles = [t["title"] for t in r.json()["topics"]]
+    assert "My Topic" in titles
+
+
+def test_patch_topic_wrong_user_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    owner = UserFactory.create(session)
+    requester = UserFactory.create(session)
+    topic = TopicFactory.create(session, owner.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, requester.id),
+    )
+    assert r.status_code == 404

@@ -8,15 +8,17 @@ from backend.ai.batch import generate_batch
 from backend.ai.diagnostic import run_diagnostic
 from backend.auth import get_current_user
 from backend.config import settings
-from backend.database.models import Batch, Question, Topic, User
+from backend.database.models import Batch, Question, Topic, TopicStatus, User
 from backend.database.repositories import (
+    AttemptRepository,
     BatchRepository,
     QuestionRepository,
+    StudySessionRepository,
     TopicRepository,
     TopicStatsRepository,
 )
 from backend.database.session import get_session
-from backend.schemas.topics import DiagnosticRequest, NewTopicRequest
+from backend.schemas.topics import DiagnosticRequest, NewTopicRequest, PatchTopicRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,10 +26,11 @@ router = APIRouter()
 
 @router.get("")
 async def list_topics(
+    include_archived: bool = False,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    topics = TopicRepository(db).list_by_user(user.id)
+    topics = TopicRepository(db).list_by_user(user.id, include_archived=include_archived)
     stats_repo = TopicStatsRepository(db)
 
     result = []
@@ -38,6 +41,7 @@ async def list_topics(
                 "id": str(topic.id),
                 "title": topic.title,
                 "domain": topic.domain,
+                "status": topic.status,
                 "accuracy_pct": stats.accuracy_pct if stats else 0.0,
                 "last_activity_at": (
                     stats.last_activity_at.isoformat()
@@ -108,6 +112,22 @@ async def create_topic(
             "created_at": topic.created_at.isoformat(),
         }
     }
+
+
+@router.patch("/{topic_id}")
+async def patch_topic(
+    topic_id: uuid.UUID,
+    body: PatchTopicRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    topic = TopicRepository(db).get_by_user_and_id(user.id, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    topic.status = TopicStatus(body.status)
+    TopicRepository(db).update(topic)
+    return {"id": str(topic.id), "status": topic.status}
 
 
 @router.post("/{topic_id}/batches", status_code=201)
