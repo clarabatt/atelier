@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
 
-    anthropic_api_key: str = ""
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     frontend_url: str = "http://localhost:5173"
     mobile_redirect_uri: str = ""

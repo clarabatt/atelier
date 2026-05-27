@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, field_validator
 
 
@@ -12,3 +14,12 @@ class NewTopicRequest(BaseModel):
         if not v:
             raise ValueError("must not be blank")
         return v
+
+
+class DiagnosticMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class DiagnosticRequest(BaseModel):
+    conversation: list[DiagnosticMessage]

@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
+from backend.ai.diagnostic import run_diagnostic
 from backend.auth import get_current_user
+from backend.config import settings
 from backend.database.models import Topic, User
 from backend.database.repositories import TopicRepository, TopicStatsRepository
 from backend.database.session import get_session
-from backend.schemas.topics import NewTopicRequest
+from backend.schemas.topics import DiagnosticRequest, NewTopicRequest
 
 router = APIRouter()
 
@@ -56,3 +60,27 @@ async def create_topic(
             "created_at": topic.created_at.isoformat(),
         }
     }
+
+
+@router.post("/{topic_id}/diagnostic")
+async def diagnostic(
+    topic_id: uuid.UUID,
+    body: DiagnosticRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    if not settings.gemini_api_key:
+        raise HTTPException(status_code=503, detail="AI service not configured")
+
+    topic = TopicRepository(db).get_by_user_and_id(user.id, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    message, summary = run_diagnostic(topic.title, topic.domain, body.conversation)
+
+    if summary is not None:
+        topic.ai_level_summary = summary
+        TopicRepository(db).update(topic)
+        return {"message": message, "is_final": True}
+
+    return {"message": message, "is_final": False}

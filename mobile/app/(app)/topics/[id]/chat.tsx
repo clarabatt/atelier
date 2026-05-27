@@ -1,10 +1,54 @@
-import { View, Text, Pressable } from 'react-native';
-import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useSessionStore } from '@/stores/session';
 
 export default function DiagnosticChatScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const topicId = Array.isArray(id) ? id[0] : id;
+
+  const { messages, isLoading, isDone, topicId: storeTopicId, startDiagnostic, sendMessage } =
+    useSessionStore();
+
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (storeTopicId !== topicId || messages.length === 0) {
+      startDiagnostic(topicId);
+    }
+  }, [topicId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    return () => clearTimeout(t);
+  }, [messages.length, isLoading]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || isLoading || isDone) return;
+    setInput('');
+    await sendMessage(text);
+    inputRef.current?.focus();
+  }
+
   return (
-    <View className="flex-1 bg-slate-50">
-      <View className="bg-indigo-600 px-6 pt-14 pb-6 flex-row items-center gap-3">
+    <KeyboardAvoidingView
+      className="flex-1"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      {/* Header */}
+      <View className="bg-indigo-600 px-6 pt-14 pb-5 flex-row items-center gap-3">
         <Pressable
           className="w-8 h-8 rounded-full bg-indigo-500 items-center justify-center active:bg-indigo-400"
           onPress={() => router.dismissAll()}
@@ -17,15 +61,103 @@ export default function DiagnosticChatScreen() {
         </View>
       </View>
 
-      <View className="flex-1 items-center justify-center px-8 gap-4">
-        <View className="w-16 h-16 rounded-3xl bg-indigo-50 items-center justify-center">
-          <Text className="text-3xl">🤖</Text>
+      {/* Messages */}
+      <ScrollView
+        ref={scrollRef}
+        className="flex-1 bg-slate-50"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24, gap: 12 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {messages.map((msg, i) => (
+          <View
+            key={i}
+            style={{
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '80%',
+            }}
+          >
+            <View
+              className={
+                msg.role === 'user'
+                  ? 'bg-indigo-600 rounded-3xl rounded-tr-sm px-4 py-3'
+                  : 'bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-4 py-3'
+              }
+            >
+              <Text
+                className={`text-sm leading-relaxed ${
+                  msg.role === 'user' ? 'text-white' : 'text-slate-800'
+                }`}
+              >
+                {msg.content}
+              </Text>
+            </View>
+          </View>
+        ))}
+
+        {/* Typing indicator */}
+        {isLoading && (
+          <View style={{ alignSelf: 'flex-start' }}>
+            <View className="bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-5 py-4">
+              <ActivityIndicator size="small" color="#6366f1" />
+            </View>
+          </View>
+        )}
+
+        {/* Completion card */}
+        {isDone && !isLoading && (
+          <View className="mt-4 bg-emerald-50 border border-emerald-100 rounded-2xl p-5 items-center gap-3">
+            <Text className="text-3xl">✅</Text>
+            <Text className="text-base font-bold text-slate-900 text-center">
+              We're ready — generating your first batch
+            </Text>
+            <Text className="text-sm text-slate-500 text-center leading-relaxed">
+              Your personalised exercises will be ready shortly.
+            </Text>
+            <Pressable
+              className="bg-indigo-600 rounded-xl px-6 py-3 mt-1 active:bg-indigo-700"
+              onPress={() => router.navigate('/topics')}
+            >
+              <Text className="text-white font-semibold text-sm">Go to my topics</Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Input */}
+      {!isDone && (
+        <View className="bg-white border-t border-slate-100 px-4 py-3 flex-row items-end gap-3">
+          <TextInput
+            ref={inputRef}
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-base text-slate-900"
+            placeholder="Type your answer…"
+            placeholderTextColor="#94a3b8"
+            value={input}
+            onChangeText={setInput}
+            multiline
+            maxLength={500}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={handleSend}
+            editable={!isLoading}
+          />
+          <Pressable
+            className={`w-11 h-11 rounded-full items-center justify-center ${
+              input.trim() && !isLoading ? 'bg-indigo-600 active:bg-indigo-700' : 'bg-slate-200'
+            }`}
+            onPress={handleSend}
+            disabled={!input.trim() || isLoading}
+          >
+            <Text
+              className={`text-base font-bold ${
+                input.trim() && !isLoading ? 'text-white' : 'text-slate-400'
+              }`}
+            >
+              ↑
+            </Text>
+          </Pressable>
         </View>
-        <Text className="text-base font-semibold text-slate-900">Diagnostic coming soon</Text>
-        <Text className="text-sm text-slate-500 text-center leading-relaxed">
-          The AI will ask a few questions here to assess your current level before generating your first batch of exercises.
-        </Text>
-      </View>
-    </View>
+      )}
+    </KeyboardAvoidingView>
   );
 }

@@ -26,3 +26,24 @@ export async function createTopic(title: string, domain: string): Promise<NewTop
   const { data } = await api.post<{ topic: NewTopic }>('/api/topics', { title, domain });
   return data.topic;
 }
+
+export interface DiagnosticMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface DiagnosticResponse {
+  message: string;
+  is_final: boolean;
+}
+
+export async function runDiagnostic(
+  topicId: string,
+  conversation: DiagnosticMessage[],
+): Promise<DiagnosticResponse> {
+  const { data } = await api.post<DiagnosticResponse>(
+    `/api/topics/${topicId}/diagnostic`,
+    { conversation },
+  );
+  return data;
+}
