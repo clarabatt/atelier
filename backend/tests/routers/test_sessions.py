@@ -4,8 +4,11 @@ from datetime import datetime
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from backend.database.models import Attempt, AttemptStatus, TopicStats
+from unittest.mock import patch
+
+from backend.database.models import Attempt, AttemptStatus, BatchStatus, TopicStats
 from backend.database.repositories import (
+    AttemptRepository,
     BatchRepository,
     StudySessionRepository,
     TopicStatsRepository,
@@ -278,3 +281,164 @@ def test_complete_session_updates_existing_stats(client: TestClient, session: Se
     stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
     assert stats.total_answered == 20
     assert stats.accuracy_pct == 60.0
+
+
+# ---------------------------------------------------------------------------
+# AI double-check (AT-018, AT-019)
+# ---------------------------------------------------------------------------
+
+def _ai_check_patch(verdict: str, explanation: str = "Re-check explanation."):
+    return patch(
+        "backend.routers.sessions.ai_double_check",  # noqa: F821 — patched dynamically via local import
+        return_value={"verdict": verdict, "explanation": explanation},
+    )
+
+
+def _setup_attempt(session: Session, status: AttemptStatus):
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    question = QuestionFactory.create(session, batch.id)
+    study_session = StudySessionFactory.create(
+        session, user.id, batch.id,
+        correct_count=1 if status == AttemptStatus.correct else 0,
+        wrong_count=1 if status == AttemptStatus.wrong else 0,
+    )
+    attempt = Attempt(
+        user_id=user.id,
+        question_id=question.id,
+        session_id=study_session.id,
+        user_answer="student answer",
+        status=status,
+    )
+    session.add(attempt)
+    session.commit()
+    session.refresh(attempt)
+    return user, question, study_session, attempt
+
+
+def test_ai_check_confirmed_does_not_change_counts(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    url = f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check"
+
+    with patch("backend.ai.double_check.ai_double_check",
+               return_value={"verdict": "confirmed", "explanation": "Stands."}):
+        r = client.post(url, headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["verdict"] == "confirmed"
+    assert body["explanation"] == "Stands."
+
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted.wrong_count == 1
+    assert persisted.correct_count == 0
+
+
+def test_ai_check_overridden_updates_session_counts(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    url = f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check"
+
+    with patch("backend.ai.double_check.ai_double_check",
+               return_value={"verdict": "overridden", "explanation": "Valid paraphrase."}):
+        r = client.post(url, headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 200
+    assert r.json()["verdict"] == "overridden"
+
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert persisted.correct_count == 1
+    assert persisted.wrong_count == 0
+
+
+def test_ai_check_stores_verdict_on_attempt(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    url = f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check"
+
+    with patch("backend.ai.double_check.ai_double_check",
+               return_value={"verdict": "overridden", "explanation": "Good answer."}):
+        client.post(url, headers=_auth(session_cookie, user.id))
+
+    persisted_attempt = AttemptRepository(session).get_by_id(attempt.id)
+    assert persisted_attempt.ai_check_requested is True
+    assert persisted_attempt.ai_check_verdict.value == "overridden"
+    assert persisted_attempt.ai_check_explanation == "Good answer."
+
+
+def test_ai_check_second_call_returns_409(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    url = f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check"
+
+    with patch("backend.ai.double_check.ai_double_check",
+               return_value={"verdict": "confirmed", "explanation": "Stands."}):
+        client.post(url, headers=_auth(session_cookie, user.id))
+        r2 = client.post(url, headers=_auth(session_cookie, user.id))
+
+    assert r2.status_code == 409
+
+
+def test_ai_check_session_not_found(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    r = client.post(
+        f"/api/sessions/{uuid.uuid4()}/attempts/{uuid.uuid4()}/ai-check",
+        headers=_auth(session_cookie, user.id),
+    )
+    assert r.status_code == 404
+
+
+def test_ai_check_wrong_user_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    _, _, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    other_user = UserFactory.create(session)
+    r = client.post(
+        f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check",
+        headers=_auth(session_cookie, other_user.id),
+    )
+    assert r.status_code == 404
+
+
+def test_ai_check_attempt_not_in_session_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session, attempt = _setup_attempt(session, AttemptStatus.wrong)
+    other_topic = TopicFactory.create(session, user.id)
+    other_batch = BatchFactory.create(session, other_topic.id)
+    other_session = StudySessionFactory.create(session, user.id, other_batch.id)
+
+    r = client.post(
+        f"/api/sessions/{other_session.id}/attempts/{attempt.id}/ai-check",
+        headers=_auth(session_cookie, user.id),
+    )
+    assert r.status_code == 404
+
+
+def test_ai_check_override_at_threshold_triggers_next_batch(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="intermediate")
+    batch = BatchFactory.create(session, topic.id)
+    question = QuestionFactory.create(session, batch.id)
+    study_session = StudySessionFactory.create(
+        session, user.id, batch.id, correct_count=15, wrong_count=5
+    )
+    attempt = Attempt(
+        user_id=user.id,
+        question_id=question.id,
+        session_id=study_session.id,
+        user_answer="answer",
+        status=AttemptStatus.wrong,
+    )
+    session.add(attempt)
+    session.commit()
+    session.refresh(attempt)
+
+    with patch("backend.ai.double_check.ai_double_check",
+               return_value={"verdict": "overridden", "explanation": "Override."}), \
+         patch("backend.routers.topics._save_batch") as mock_save:
+        r = client.post(
+            f"/api/sessions/{study_session.id}/attempts/{attempt.id}/ai-check",
+            headers=_auth(session_cookie, user.id),
+        )
+
+    assert r.status_code == 200
+    persisted_batch = BatchRepository(session).get_by_id(batch.id)
+    assert persisted_batch.status == BatchStatus.completed
+    mock_save.assert_called_once()

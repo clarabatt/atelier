@@ -14,6 +14,8 @@ import {
   startSession,
   recordAttempt,
   completeSession,
+  requestAiCheck,
+  type AiCheckResult,
   type SessionQuestion,
   type SessionResult,
 } from '@/lib/sessions';
@@ -40,6 +42,12 @@ export default function SessionScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
+  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
+  const [lastAnswerWrong, setLastAnswerWrong] = useState(false);
+  const [aiCheckResult, setAiCheckResult] = useState<AiCheckResult | null>(null);
+  const [aiChecking, setAiChecking] = useState(false);
+  const [aiCheckUsed, setAiCheckUsed] = useState(false);
+
   useEffect(() => {
     startSession(topicId)
       .then((data) => {
@@ -58,9 +66,12 @@ export default function SessionScreen() {
     if (phase !== 'question' || !question || !sessionId || submitting) return;
     setSelectedOption(option);
     setSubmitting(true);
-    const status = option === question.correct_answer ? 'correct' : 'wrong';
+    const isCorrect = option === question.correct_answer;
+    const status = isCorrect ? 'correct' : 'wrong';
     try {
-      await recordAttempt(sessionId, question.id, option, status);
+      const attemptId = await recordAttempt(sessionId, question.id, option, status);
+      setCurrentAttemptId(attemptId);
+      setLastAnswerWrong(!isCorrect);
     } catch { /* best effort */ }
     setSubmitting(false);
     setPhase('reveal');
@@ -74,10 +85,26 @@ export default function SessionScreen() {
     if (!sessionId || !question || submitting) return;
     setSubmitting(true);
     try {
-      await recordAttempt(sessionId, question.id, textAnswer, status);
+      const attemptId = await recordAttempt(sessionId, question.id, textAnswer, status);
+      setCurrentAttemptId(attemptId);
+      setLastAnswerWrong(status === 'wrong');
     } catch { /* best effort */ }
     setSubmitting(false);
-    await advance();
+    if (status === 'correct') {
+      await advance();
+    }
+    // If wrong, stay in reveal to allow double-check
+  }
+
+  async function handleAiCheck() {
+    if (!sessionId || !currentAttemptId || aiCheckUsed || aiChecking) return;
+    setAiChecking(true);
+    try {
+      const result = await requestAiCheck(sessionId, currentAttemptId);
+      setAiCheckResult(result);
+      setAiCheckUsed(true);
+    } catch { /* best effort */ }
+    setAiChecking(false);
   }
 
   async function advance() {
@@ -91,6 +118,10 @@ export default function SessionScreen() {
       setCurrentIdx((i) => i + 1);
       setSelectedOption(null);
       setTextAnswer('');
+      setCurrentAttemptId(null);
+      setLastAnswerWrong(false);
+      setAiCheckResult(null);
+      setAiCheckUsed(false);
       setPhase('question');
     }
   }
@@ -237,6 +268,41 @@ export default function SessionScreen() {
           </View>
         )}
 
+        {/* AI override result card */}
+        {aiCheckResult?.verdict === 'overridden' && (
+          <View className="bg-emerald-50 border border-emerald-300 rounded-2xl p-4 mb-4">
+            <Text className="text-xs font-semibold text-emerald-700 mb-1">AI overrode — marked as correct</Text>
+            <Text className="text-sm text-emerald-800">{aiCheckResult.explanation}</Text>
+          </View>
+        )}
+        {aiCheckResult?.verdict === 'confirmed' && (
+          <View className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
+            <Text className="text-xs font-semibold text-slate-500 mb-1">AI confirmed original verdict</Text>
+            <Text className="text-sm text-slate-700">{aiCheckResult.explanation}</Text>
+          </View>
+        )}
+
+        {/* AI double-check button (shown when answer was wrong in reveal phase) */}
+        {phase === 'reveal' && lastAnswerWrong && (
+          <Pressable
+            className={`border rounded-2xl py-3 items-center mb-3 ${
+              aiCheckUsed
+                ? 'bg-slate-50 border-slate-200'
+                : 'bg-white border-indigo-300 active:bg-indigo-50'
+            }`}
+            onPress={handleAiCheck}
+            disabled={aiCheckUsed || aiChecking}
+          >
+            {aiChecking ? (
+              <ActivityIndicator size="small" color="#6366f1" />
+            ) : (
+              <Text className={`text-sm font-semibold ${aiCheckUsed ? 'text-slate-400' : 'text-indigo-600'}`}>
+                {aiCheckUsed ? 'Already checked' : 'Ask AI to double-check'}
+              </Text>
+            )}
+          </Pressable>
+        )}
+
         {/* Action buttons */}
         {phase === 'question' && question.format !== 'mcq' && (
           <Pressable
@@ -259,7 +325,7 @@ export default function SessionScreen() {
           </Pressable>
         )}
 
-        {phase === 'reveal' && question.format !== 'mcq' && (
+        {phase === 'reveal' && question.format !== 'mcq' && !currentAttemptId && (
           <View className="flex-row gap-3">
             <Pressable
               className="flex-1 bg-emerald-50 border border-emerald-300 rounded-2xl py-4 items-center active:bg-emerald-100"
@@ -276,6 +342,18 @@ export default function SessionScreen() {
               <Text className="text-red-700 font-semibold text-sm">✗  Missed it</Text>
             </Pressable>
           </View>
+        )}
+
+        {phase === 'reveal' && question.format !== 'mcq' && currentAttemptId && (
+          <Pressable
+            className="bg-indigo-600 rounded-2xl py-4 items-center mt-2 active:bg-indigo-700"
+            onPress={advance}
+            disabled={submitting}
+          >
+            <Text className="text-white font-semibold">
+              {isLastQuestion ? 'Finish' : 'Next →'}
+            </Text>
+          </Pressable>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
