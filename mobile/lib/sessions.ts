@@ -17,6 +17,7 @@ export interface SessionData {
   correct_count: number;
   wrong_count: number;
   skipped_count: number;
+  skipped_queue: string[];
 }
 
 export interface SessionResult {

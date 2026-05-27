@@ -61,6 +61,7 @@ async def start_session(
         "correct_count": session_obj.correct_count,
         "wrong_count": session_obj.wrong_count,
         "skipped_count": session_obj.skipped_count,
+        "skipped_queue": session_obj.skipped_queue,
     }
 
 
@@ -97,6 +98,9 @@ async def record_attempt(
         session_obj.wrong_count += 1
     else:
         session_obj.skipped_count += 1
+        queue = list(session_obj.skipped_queue or [])
+        queue.append(str(body.question_id))
+        session_obj.skipped_queue = queue
     StudySessionRepository(db).update(session_obj)
 
     return {"attempt_id": str(attempt.id)}
