@@ -14,6 +14,21 @@ export async function fetchTopics(): Promise<Topic[]> {
   return data.topics;
 }
 
+export interface TopicDetail {
+  id: string;
+  title: string;
+  domain: string;
+  ai_level_summary: string | null;
+  accuracy_pct: number;
+  last_activity_at: string | null;
+  created_at: string;
+}
+
+export async function fetchTopic(id: string): Promise<TopicDetail> {
+  const { data } = await api.get<{ topic: TopicDetail }>(`/api/topics/${id}`);
+  return data.topic;
+}
+
 export interface NewTopic {
   id: string;
   title: string;

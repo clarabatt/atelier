@@ -43,6 +43,32 @@ async def list_topics(
     return {"topics": result}
 
 
+@router.get("/{topic_id}")
+async def get_topic(
+    topic_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    topic = TopicRepository(db).get_by_user_and_id(user.id, topic_id)
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    stats = TopicStatsRepository(db).get_by_user_and_topic(user.id, topic_id)
+    return {
+        "topic": {
+            "id": str(topic.id),
+            "title": topic.title,
+            "domain": topic.domain,
+            "ai_level_summary": topic.ai_level_summary,
+            "accuracy_pct": stats.accuracy_pct if stats else 0.0,
+            "last_activity_at": (
+                stats.last_activity_at.isoformat() if stats and stats.last_activity_at else None
+            ),
+            "created_at": topic.created_at.isoformat(),
+        }
+    }
+
+
 @router.post("", status_code=201)
 async def create_topic(
     body: NewTopicRequest,
