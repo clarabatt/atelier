@@ -6,6 +6,8 @@ dist/
 wheels/
 *.egg-info
 .venv
+.coverage
+htmlcov/
 
 # Environment
 .env
