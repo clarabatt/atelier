@@ -278,3 +278,81 @@ def test_complete_session_updates_existing_stats(client: TestClient, session: Se
     stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
     assert stats.total_answered == 20
     assert stats.accuracy_pct == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Batch summary fields (AT-020)
+# ---------------------------------------------------------------------------
+
+def test_complete_session_returns_time_taken(client: TestClient, session: Session, session_cookie) -> None:
+    user, _, study_session = _setup(session)
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 200
+    assert "time_taken_seconds" in r.json()
+    assert r.json()["time_taken_seconds"] >= 0
+
+
+def test_complete_session_threshold_passed_true(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=16, wrong_count=4)
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert r.json()["threshold_passed"] is True
+
+
+def test_complete_session_threshold_passed_false_low_accuracy(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=10, wrong_count=10)
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert r.json()["threshold_passed"] is False
+
+
+def test_complete_session_threshold_passed_false_too_few_answered(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=8, wrong_count=2)
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert r.json()["threshold_passed"] is False
+
+
+def test_complete_session_includes_weak_questions(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    q1 = QuestionFactory.create(session, batch.id, position=1)
+    q2 = QuestionFactory.create(session, batch.id, position=2)
+    study_session = StudySessionFactory.create(session, user.id, batch.id)
+
+    session.add(Attempt(user_id=user.id, question_id=q1.id, session_id=study_session.id, status=AttemptStatus.wrong))
+    session.add(Attempt(user_id=user.id, question_id=q2.id, session_id=study_session.id, status=AttemptStatus.correct))
+    session.commit()
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    weak = r.json()["weak_questions"]
+    assert len(weak) == 1
+    assert weak[0]["id"] == str(q1.id)
+    assert "body" in weak[0]
+    assert "correct_answer" in weak[0]
+    assert "reasoning" in weak[0]
+
+
+def test_complete_session_weak_questions_capped_at_three(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id)
+
+    for i in range(5):
+        q = QuestionFactory.create(session, batch.id, position=i + 1)
+        session.add(Attempt(user_id=user.id, question_id=q.id, session_id=study_session.id, status=AttemptStatus.wrong))
+    session.commit()
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert len(r.json()["weak_questions"]) == 3

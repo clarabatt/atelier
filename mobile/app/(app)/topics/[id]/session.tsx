@@ -16,6 +16,7 @@ import {
   completeSession,
   type SessionQuestion,
   type SessionResult,
+  type WeakQuestion,
 } from '@/lib/sessions';
 
 type Phase = 'loading' | 'question' | 'reveal' | 'complete';
@@ -121,7 +122,7 @@ export default function SessionScreen() {
           <Text className="text-white text-xl font-bold">Practice</Text>
         </View>
         {phase === 'complete' ? (
-          <CompletionScreen results={results} onBack={() => router.back()} />
+          <CompletionScreen results={results} topicId={topicId} onBack={() => router.back()} />
         ) : (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#6366f1" />
@@ -143,7 +144,7 @@ export default function SessionScreen() {
           </Pressable>
           <Text className="text-white text-xl font-bold">Practice</Text>
         </View>
-        <CompletionScreen results={results} onBack={() => router.back()} />
+        <CompletionScreen results={results} topicId={topicId} onBack={() => router.back()} />
       </View>
     );
   }
@@ -284,24 +285,79 @@ export default function SessionScreen() {
 
 function CompletionScreen({
   results,
+  topicId,
   onBack,
 }: {
   results: SessionResult | null;
+  topicId: string;
   onBack: () => void;
 }) {
+  const passed = results?.threshold_passed ?? false;
+  const minutes = results ? Math.floor(results.time_taken_seconds / 60) : 0;
+  const seconds = results ? results.time_taken_seconds % 60 : 0;
+  const timeLabel = minutes > 0
+    ? `${minutes}m ${seconds}s`
+    : `${seconds}s`;
+
   return (
-    <View className="flex-1 items-center justify-center px-6 gap-4">
-      <Text className="text-5xl">🎉</Text>
+    <ScrollView
+      className="flex-1"
+      contentContainerClassName="items-center px-6 pt-8 pb-12 gap-4"
+    >
+      <Text className="text-5xl">{passed ? '🎉' : '📚'}</Text>
       <Text className="text-3xl font-bold text-slate-900">
         {results ? `${results.accuracy_pct}%` : 'Done!'}
       </Text>
       <Text className="text-base text-slate-500">Session complete</Text>
 
       {results && (
-        <View className="bg-white border border-slate-100 rounded-2xl p-5 w-full gap-3 mt-2">
+        <View className="bg-white border border-slate-100 rounded-2xl p-5 w-full gap-3">
           <ResultRow label="Correct" value={results.correct} color="text-emerald-600" />
           <ResultRow label="Wrong" value={results.wrong} color="text-red-500" />
           <ResultRow label="Skipped" value={results.skipped} color="text-slate-400" />
+          <View className="h-px bg-slate-100 my-1" />
+          <View className="flex-row justify-between items-center">
+            <Text className="text-sm text-slate-600">Time taken</Text>
+            <Text className="text-sm font-bold text-slate-700">{timeLabel}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Threshold message */}
+      {results && (
+        <View
+          className={`rounded-2xl p-4 w-full ${passed ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}
+        >
+          {passed ? (
+            <>
+              <Text className="text-sm font-semibold text-emerald-700 mb-1">
+                Well done — your next batch is being generated!
+              </Text>
+              <ActivityIndicator size="small" color="#059669" style={{ alignSelf: 'flex-start', marginTop: 4 }} />
+            </>
+          ) : (
+            <>
+              <Text className="text-sm font-semibold text-amber-700 mb-3">
+                Keep practising — you need 80% to unlock the next batch.
+              </Text>
+              <Pressable
+                className="bg-amber-500 rounded-xl py-3 items-center active:bg-amber-600"
+                onPress={() => router.replace(`/topics/${topicId}/session`)}
+              >
+                <Text className="text-white font-semibold text-sm">Try again</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
+
+      {/* Weak questions */}
+      {results && results.weak_questions.length > 0 && (
+        <View className="w-full">
+          <Text className="text-sm font-semibold text-slate-700 mb-3">Review these questions:</Text>
+          {results.weak_questions.map((q) => (
+            <WeakQuestionCard key={q.id} question={q} />
+          ))}
         </View>
       )}
 
@@ -311,7 +367,29 @@ function CompletionScreen({
       >
         <Text className="text-white font-semibold">Back to topic</Text>
       </Pressable>
-    </View>
+    </ScrollView>
+  );
+}
+
+function WeakQuestionCard({ question }: { question: WeakQuestion }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <Pressable
+      className="bg-white border border-slate-100 rounded-2xl p-4 mb-3"
+      onPress={() => setExpanded((v) => !v)}
+    >
+      <Text className="text-sm text-slate-800 leading-relaxed mb-2">{question.body}</Text>
+      {expanded && (
+        <>
+          <View className="h-px bg-slate-100 mb-2" />
+          <Text className="text-xs font-semibold text-emerald-600 mb-1">Correct answer</Text>
+          <Text className="text-sm text-emerald-800 mb-2">{question.correct_answer}</Text>
+          <Text className="text-xs font-semibold text-slate-500 mb-1">Why</Text>
+          <Text className="text-sm text-slate-600">{question.reasoning}</Text>
+        </>
+      )}
+      <Text className="text-xs text-indigo-500 mt-1">{expanded ? 'Collapse ▲' : 'See answer ▼'}</Text>
+    </Pressable>
   );
 }
 

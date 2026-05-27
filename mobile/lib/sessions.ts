@@ -19,11 +19,21 @@ export interface SessionData {
   skipped_count: number;
 }
 
+export interface WeakQuestion {
+  id: string;
+  body: string;
+  correct_answer: string;
+  reasoning: string;
+}
+
 export interface SessionResult {
   correct: number;
   wrong: number;
   skipped: number;
   accuracy_pct: number;
+  time_taken_seconds: number;
+  threshold_passed: boolean;
+  weak_questions: WeakQuestion[];
 }
 
 export async function startSession(topicId: string): Promise<SessionData> {
