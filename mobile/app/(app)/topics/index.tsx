@@ -28,8 +28,8 @@ function TopicCard({ topic }: { topic: Topic }) {
         <Text className="text-base font-semibold text-slate-900 flex-1 mr-3" numberOfLines={2}>
           {topic.title}
         </Text>
-        <View className="bg-slate-100 rounded-lg px-2.5 py-1">
-          <Text className="text-xs font-medium text-slate-500 capitalize">{topic.domain}</Text>
+        <View className="bg-indigo-50 rounded-lg px-2.5 py-1">
+          <Text className="text-xs font-medium text-indigo-600 capitalize">{topic.domain}</Text>
         </View>
       </View>
 
@@ -88,7 +88,7 @@ export default function TopicsScreen() {
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#64748b" />
+          <ActivityIndicator size="large" color="#6366f1" />
         </View>
       ) : error ? (
         <View className="flex-1 items-center justify-center px-8">
