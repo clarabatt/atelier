@@ -26,7 +26,7 @@ export interface TopicDetail {
 }
 
 export async function generateBatch(topicId: string): Promise<void> {
-  await api.post(`/api/topics/${topicId}/batches`);
+  await api.post(`/api/topics/${topicId}/batches`, undefined, { timeout: 120_000 });
 }
 
 export async function fetchTopic(id: string): Promise<TopicDetail> {
@@ -53,7 +53,7 @@ export async function createTopic(
     title,
     domain,
     ...(initial_level ? { initial_level } : {}),
-  });
+  }, { timeout: initial_level ? 120_000 : 10_000 });
   return data.topic;
 }
 
@@ -74,6 +74,7 @@ export async function runDiagnostic(
   const { data } = await api.post<DiagnosticResponse>(
     `/api/topics/${topicId}/diagnostic`,
     { conversation },
+    { timeout: 60_000 },
   );
   return data;
 }

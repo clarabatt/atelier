@@ -87,7 +87,7 @@ export default function TopicDetailScreen() {
           {topic.has_batch ? (
             <Pressable
               className="bg-indigo-600 rounded-2xl py-4 items-center active:bg-indigo-700"
-              onPress={() => {/* TODO: navigate to study session */}}
+              onPress={() => router.push(`/topics/${topic.id}/session`)}
             >
               <Text className="text-white text-base font-semibold">Start practising</Text>
             </Pressable>
