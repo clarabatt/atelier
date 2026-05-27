@@ -24,6 +24,8 @@ export interface SessionResult {
   wrong: number;
   skipped: number;
   accuracy_pct: number;
+  threshold_passed: boolean;
+  new_batch_generating: boolean;
 }
 
 export async function startSession(topicId: string): Promise<SessionData> {
