@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { fetchTopics, type Topic } from '@/lib/topics';
 
 export default function HomeScreen() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  async function handleSignOut() {
+    setMenuVisible(false);
+    await logout();
+    router.replace('/(auth)/login');
+  }
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,19 +42,21 @@ export default function HomeScreen() {
       <View className="bg-indigo-600 px-6 pt-14 pb-12">
         <View className="flex-row items-start justify-between mb-3">
           <Text className="text-indigo-300 text-sm">{greeting}</Text>
-          {user?.picture_url ? (
-            <Image
-              source={{ uri: user.picture_url }}
-              style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
-            />
-          ) : (
-            <View
-              style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
-              className="bg-indigo-500 items-center justify-center"
-            >
-              <Text className="text-white text-sm font-bold">{initials}</Text>
-            </View>
-          )}
+          <Pressable onPress={() => setMenuVisible(true)} hitSlop={8}>
+            {user?.picture_url ? (
+              <Image
+                source={{ uri: user.picture_url }}
+                style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
+              />
+            ) : (
+              <View
+                style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
+                className="bg-indigo-500 items-center justify-center"
+              >
+                <Text className="text-white text-sm font-bold">{initials}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
         <Text className="text-white text-3xl font-bold">
           {user?.display_name ?? 'there'} 👋
@@ -129,6 +138,29 @@ export default function HomeScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Account menu */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable className="flex-1" onPress={() => setMenuVisible(false)}>
+          <View className="absolute top-28 right-5 bg-white rounded-2xl overflow-hidden" style={{ minWidth: 200, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }}>
+            <View className="px-4 py-3 border-b border-slate-100">
+              <Text className="text-sm font-semibold text-slate-900">{user?.display_name}</Text>
+              <Text className="text-xs text-slate-400 mt-0.5">{user?.email}</Text>
+            </View>
+            <Pressable
+              className="px-4 py-3 active:bg-slate-50"
+              onPress={handleSignOut}
+            >
+              <Text className="text-sm text-red-500 font-medium">Sign out</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
     </View>
   );
