@@ -145,6 +145,31 @@ def test_record_attempt_skipped_increments_count(client: TestClient, session: Se
     assert persisted.skipped_count == 1
 
 
+def test_record_attempt_skipped_appends_to_queue(client: TestClient, session: Session, session_cookie) -> None:
+    user, question, study_session = _setup(session)
+    client.post(
+        f"/api/sessions/{study_session.id}/attempts",
+        json={"question_id": str(question.id), "user_answer": "", "status": "skipped"},
+        headers=_auth(session_cookie, user.id),
+    )
+    persisted = StudySessionRepository(session).get_by_id(study_session.id)
+    assert str(question.id) in persisted.skipped_queue
+
+
+def test_start_session_response_includes_skipped_queue(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    question = QuestionFactory.create(session, batch.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, skipped_queue=[str(question.id)])
+
+    r = client.post("/api/sessions", json={"topic_id": str(topic.id)}, headers=_auth(session_cookie, user.id))
+    assert r.status_code == 201
+    assert str(question.id) in r.json()["skipped_queue"]
+
+
 def test_record_attempt_duplicate_returns_existing(client: TestClient, session: Session, session_cookie) -> None:
     user, question, study_session = _setup(session)
     headers = _auth(session_cookie, user.id)
