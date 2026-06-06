@@ -12,6 +12,7 @@ import {
 import { router } from "expo-router";
 import { createTopic, TopicLevel } from "@/lib/topics";
 import { ModeCard } from "@/components/ModeCard";
+import { BackButton } from "@/components/BackButton";
 
 type LevelMode = "diagnostic" | "manual";
 
@@ -84,17 +85,7 @@ export default function NewTopicScreen() {
       {/* Header */}
       <View className="bg-indigo-600 px-6 pt-14 pb-6">
         <View className="flex-row items-center gap-3">
-          <Pressable
-            className="w-8 h-8 rounded-full bg-indigo-500 items-center justify-center active:bg-indigo-400"
-            onPress={() => router.back()}
-          >
-            <Text
-              className="text-white text-xl leading-none"
-              style={{ marginTop: -5 }}
-            >
-              ‹
-            </Text>
-          </Pressable>
+          <BackButton />
           <Text className="text-white text-xl font-bold">New topic</Text>
         </View>
       </View>

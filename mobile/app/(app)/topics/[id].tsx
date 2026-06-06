@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { fetchTopic, generateBatch, type TopicDetail } from '@/lib/topics';
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { fetchTopic, generateBatch, type TopicDetail } from "@/lib/topics";
+import { BackButton } from "@/components/BackButton";
 
 export default function TopicDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
@@ -47,18 +48,15 @@ export default function TopicDetailScreen() {
     <View className="flex-1 bg-slate-50">
       {/* Header */}
       <View className="bg-indigo-600 px-6 pt-14 pb-6 flex-row items-center gap-3">
-        <Pressable
-          className="w-8 h-8 rounded-full bg-indigo-500 items-center justify-center active:bg-indigo-400"
-          onPress={() => router.back()}
-        >
-          <Text className="text-white text-xl leading-none" style={{ marginTop: -1 }}>‹</Text>
-        </Pressable>
+        <BackButton />
         <View className="flex-1">
           <Text className="text-white text-xl font-bold" numberOfLines={1}>
-            {topic?.title ?? ' '}
+            {topic?.title ?? " "}
           </Text>
           {topic && (
-            <Text className="text-indigo-300 text-xs capitalize">{topic.domain}</Text>
+            <Text className="text-indigo-300 text-xs capitalize">
+              {topic.domain}
+            </Text>
           )}
         </View>
       </View>
@@ -94,22 +92,28 @@ export default function TopicDetailScreen() {
               className="bg-indigo-600 rounded-2xl py-4 items-center active:bg-indigo-700"
               onPress={() => router.push(`/topics/${topic.id}/session`)}
             >
-              <Text className="text-white text-base font-semibold">Start practising</Text>
+              <Text className="text-white text-base font-semibold">
+                Start practising
+              </Text>
             </Pressable>
           ) : generatingBatch ? (
             <View className="bg-white border border-slate-100 rounded-2xl p-5 items-center gap-3">
               <ActivityIndicator size="small" color="#6366f1" />
-              <Text className="text-sm text-slate-500">Generating your questions…</Text>
+              <Text className="text-sm text-slate-500">
+                Generating your questions…
+              </Text>
             </View>
           ) : (
             <View className="bg-amber-50 border border-amber-100 rounded-2xl p-5 gap-3">
               <Text className="text-sm font-semibold text-amber-800">
-                {batchError ? 'Question generation failed' : 'Questions not ready yet'}
+                {batchError
+                  ? "Question generation failed"
+                  : "Questions not ready yet"}
               </Text>
               <Text className="text-xs text-amber-700 leading-relaxed">
                 {batchError
-                  ? 'Something went wrong while generating your exercises. Tap below to try again.'
-                  : 'Your first batch of exercises could not be generated. Tap below to retry.'}
+                  ? "Something went wrong while generating your exercises. Tap below to try again."
+                  : "Your first batch of exercises could not be generated. Tap below to retry."}
               </Text>
               <Pressable
                 className="bg-amber-500 rounded-xl py-3 items-center active:bg-amber-600"

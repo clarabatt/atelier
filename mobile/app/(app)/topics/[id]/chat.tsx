@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -8,18 +8,25 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useSessionStore } from '@/stores/session';
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useSessionStore } from "@/stores/session";
+import { BackButton } from "@/components/BackButton";
 
 export default function DiagnosticChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const topicId = Array.isArray(id) ? id[0] : id;
 
-  const { messages, isLoading, isDone, topicId: storeTopicId, startDiagnostic, sendMessage } =
-    useSessionStore();
+  const {
+    messages,
+    isLoading,
+    isDone,
+    topicId: storeTopicId,
+    startDiagnostic,
+    sendMessage,
+  } = useSessionStore();
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -30,14 +37,17 @@ export default function DiagnosticChatScreen() {
   }, [topicId]);
 
   useEffect(() => {
-    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    const t = setTimeout(
+      () => scrollRef.current?.scrollToEnd({ animated: true }),
+      80,
+    );
     return () => clearTimeout(t);
   }, [messages.length, isLoading]);
 
   async function handleSend() {
     const text = input.trim();
     if (!text || isLoading || isDone) return;
-    setInput('');
+    setInput("");
     await sendMessage(text);
     inputRef.current?.focus();
   }
@@ -45,16 +55,11 @@ export default function DiagnosticChatScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Header */}
       <View className="bg-indigo-600 px-6 pt-14 pb-5 flex-row items-center gap-3">
-        <Pressable
-          className="w-8 h-8 rounded-full bg-indigo-500 items-center justify-center active:bg-indigo-400"
-          onPress={() => router.dismissAll()}
-        >
-          <Text className="text-white text-xl leading-none" style={{ marginTop: -1 }}>‹</Text>
-        </Pressable>
+        <BackButton onPress={() => router.dismissAll()} />
         <View>
           <Text className="text-white text-xl font-bold">Diagnostic</Text>
           <Text className="text-indigo-300 text-xs">Let's find your level</Text>
@@ -65,7 +70,11 @@ export default function DiagnosticChatScreen() {
       <ScrollView
         ref={scrollRef}
         className="flex-1 bg-slate-50"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 24, gap: 12 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingVertical: 24,
+          gap: 12,
+        }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -73,20 +82,20 @@ export default function DiagnosticChatScreen() {
           <View
             key={i}
             style={{
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '80%',
+              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: "80%",
             }}
           >
             <View
               className={
-                msg.role === 'user'
-                  ? 'bg-indigo-600 rounded-3xl rounded-tr-sm px-4 py-3'
-                  : 'bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-4 py-3'
+                msg.role === "user"
+                  ? "bg-indigo-600 rounded-3xl rounded-tr-sm px-4 py-3"
+                  : "bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-4 py-3"
               }
             >
               <Text
                 className={`text-sm leading-relaxed ${
-                  msg.role === 'user' ? 'text-white' : 'text-slate-800'
+                  msg.role === "user" ? "text-white" : "text-slate-800"
                 }`}
               >
                 {msg.content}
@@ -97,7 +106,7 @@ export default function DiagnosticChatScreen() {
 
         {/* Typing indicator */}
         {isLoading && (
-          <View style={{ alignSelf: 'flex-start' }}>
+          <View style={{ alignSelf: "flex-start" }}>
             <View className="bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-5 py-4">
               <ActivityIndicator size="small" color="#6366f1" />
             </View>
@@ -116,9 +125,13 @@ export default function DiagnosticChatScreen() {
             </Text>
             <Pressable
               className="bg-indigo-600 rounded-xl px-6 py-3 mt-1 active:bg-indigo-700"
-              onPress={() => router.replace(`/topics/${topicId}?from=diagnostic`)}
+              onPress={() =>
+                router.replace(`/topics/${topicId}?from=diagnostic`)
+              }
             >
-              <Text className="text-white font-semibold text-sm">See my results</Text>
+              <Text className="text-white font-semibold text-sm">
+                See my results
+              </Text>
             </Pressable>
           </View>
         )}
@@ -143,14 +156,16 @@ export default function DiagnosticChatScreen() {
           />
           <Pressable
             className={`w-11 h-11 rounded-full items-center justify-center ${
-              input.trim() && !isLoading ? 'bg-indigo-600 active:bg-indigo-700' : 'bg-slate-200'
+              input.trim() && !isLoading
+                ? "bg-indigo-600 active:bg-indigo-700"
+                : "bg-slate-200"
             }`}
             onPress={handleSend}
             disabled={!input.trim() || isLoading}
           >
             <Text
               className={`text-base font-bold ${
-                input.trim() && !isLoading ? 'text-white' : 'text-slate-400'
+                input.trim() && !isLoading ? "text-white" : "text-slate-400"
               }`}
             >
               ↑
