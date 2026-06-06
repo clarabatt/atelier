@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   Text,
   View,
@@ -16,6 +15,7 @@ import {
   generateBatch,
   type TopicDetail,
 } from "@/lib/topics";
+import { ActionMenu, ActionMenuItem } from "@/components/ActionMenu";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { capitalizeFirst, formatDate } from "@/lib/utils";
 
@@ -126,6 +126,7 @@ export default function TopicDetailScreen() {
         title={topic?.title ?? " "}
         subtitle={topic ? capitalizeFirst(topic.domain) : undefined}
         rightAction={topic ? menuButton : undefined}
+        onBack={() => router.replace("/topics")}
       />
 
       {loading ? (
@@ -215,96 +216,59 @@ export default function TopicDetailScreen() {
         </View>
       )}
 
-      {/* Management menu */}
-      <Modal
-        transparent
-        visible={menuVisible}
-        animationType="fade"
-        onRequestClose={closeMenu}
-      >
-        <Pressable
-          className="flex-1 bg-black/40 justify-end"
-          onPress={closeMenu}
-        >
-          <Pressable onPress={() => {}}>
-            <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10 gap-1">
-              <Text className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                Manage topic
-              </Text>
-
-              <Pressable
-                className="flex-row items-center py-4 border-b border-slate-100 active:bg-slate-50 rounded-xl px-2"
-                onPress={() => {
-                  setMenuVisible(false);
-                  router.push(`/topics/${topicId}/edit`);
-                }}
-              >
-                <View className="w-8 items-center">
-                  <Text className="text-lg">✏️</Text>
-                </View>
-                <Text className="text-base text-slate-800">Edit</Text>
-              </Pressable>
-
-              <Pressable
-                className="flex-row items-center py-4 border-b border-slate-100 active:bg-slate-50 rounded-xl px-2"
-                onPress={handleArchiveToggle}
-              >
-                <View className="w-8 items-center">
-                  <Text className="text-lg">📦</Text>
-                </View>
-                <Text className="text-base text-slate-800">{archiveLabel}</Text>
-              </Pressable>
-
-              {confirmingDelete ? (
-                <View className="gap-3 pt-2">
-                  <Text className="text-sm text-slate-600 leading-relaxed">
-                    This will permanently delete this topic and all its questions, sessions, and stats.
-                  </Text>
-                  <Pressable
-                    className="bg-red-500 rounded-2xl py-4 items-center active:bg-red-600"
-                    onPress={confirmDelete}
-                    disabled={deleting}
-                  >
-                    {deleting ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Text className="text-white text-base font-semibold">Confirm delete</Text>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    className="bg-slate-100 rounded-2xl py-4 items-center active:bg-slate-200"
-                    onPress={() => setConfirmingDelete(false)}
-                    disabled={deleting}
-                  >
-                    <Text className="text-base font-semibold text-slate-600">Go back</Text>
-                  </Pressable>
-                </View>
+      <ActionMenu visible={menuVisible} onClose={closeMenu} title="Manage topic">
+        {confirmingDelete ? (
+          <View className="gap-3 pt-2">
+            <Text className="text-sm text-slate-600 leading-relaxed">
+              This will permanently delete this topic and all its questions, sessions, and stats.
+            </Text>
+            <Pressable
+              className="bg-red-500 rounded-2xl py-4 items-center active:bg-red-600"
+              onPress={confirmDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color="white" />
               ) : (
-                <>
-                  <Pressable
-                    className="flex-row items-center py-4 active:bg-slate-50 rounded-xl px-2"
-                    onPress={() => setConfirmingDelete(true)}
-                  >
-                    <View className="w-8 items-center">
-                      <Text className="text-lg">🗑</Text>
-                    </View>
-                    <Text className="text-base text-slate-800">Delete</Text>
-                  </Pressable>
-
-                  <Pressable
-                    className="mt-3 bg-slate-100 rounded-2xl py-4 items-center active:bg-slate-200"
-                    onPress={closeMenu}
-                  >
-                    <Text className="text-base font-semibold text-slate-600">
-                      Cancel
-                    </Text>
-                  </Pressable>
-                </>
+                <Text className="text-white text-base font-semibold">Confirm delete</Text>
               )}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+            </Pressable>
+            <Pressable
+              className="bg-slate-100 rounded-2xl py-4 items-center active:bg-slate-200"
+              onPress={() => setConfirmingDelete(false)}
+              disabled={deleting}
+            >
+              <Text className="text-base font-semibold text-slate-600">Go back</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <ActionMenuItem
+              icon="✏️"
+              label="Edit"
+              separator
+              onPress={() => { closeMenu(); router.push(`/topics/${topicId}/edit`); }}
+            />
+            <ActionMenuItem
+              icon="📦"
+              label={archiveLabel}
+              separator
+              onPress={handleArchiveToggle}
+            />
+            <ActionMenuItem
+              icon="🗑"
+              label="Delete"
+              onPress={() => setConfirmingDelete(true)}
+            />
+            <Pressable
+              className="mt-3 bg-slate-100 rounded-2xl py-4 items-center active:bg-slate-200"
+              onPress={closeMenu}
+            >
+              <Text className="text-base font-semibold text-slate-600">Cancel</Text>
+            </Pressable>
+          </>
+        )}
+      </ActionMenu>
     </View>
   );
 }
