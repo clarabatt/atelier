@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSessionStore } from "@/stores/session";
-import { BackButton } from "@/components/BackButton";
+import { ScreenHeader } from "@/components/ScreenHeader";
+import { ChatBubble } from "@/components/ChatBubble";
 
 export default function DiagnosticChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,14 +58,11 @@ export default function DiagnosticChatScreen() {
       className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Header */}
-      <View className="bg-indigo-600 px-6 pt-14 pb-5 flex-row items-center gap-3">
-        <BackButton onPress={() => router.dismissAll()} />
-        <View>
-          <Text className="text-white text-xl font-bold">Diagnostic</Text>
-          <Text className="text-indigo-300 text-xs">Let's find your level</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Diagnostic"
+        subtitle="Let's find your level"
+        onBack={() => router.dismissAll()}
+      />
 
       {/* Messages */}
       <ScrollView
@@ -79,29 +77,7 @@ export default function DiagnosticChatScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {messages.map((msg, i) => (
-          <View
-            key={i}
-            style={{
-              alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "80%",
-            }}
-          >
-            <View
-              className={
-                msg.role === "user"
-                  ? "bg-indigo-600 rounded-3xl rounded-tr-sm px-4 py-3"
-                  : "bg-white border border-slate-100 rounded-3xl rounded-tl-sm px-4 py-3"
-              }
-            >
-              <Text
-                className={`text-sm leading-relaxed ${
-                  msg.role === "user" ? "text-white" : "text-slate-800"
-                }`}
-              >
-                {msg.content}
-              </Text>
-            </View>
-          </View>
+          <ChatBubble key={i} role={msg.role} content={msg.content} />
         ))}
 
         {/* Typing indicator */}

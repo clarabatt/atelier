@@ -12,7 +12,7 @@ import {
 import { router } from "expo-router";
 import { createTopic, TopicLevel, QuestionFormat } from "@/lib/topics";
 import { ModeCard } from "@/components/ModeCard";
-import { BackButton } from "@/components/BackButton";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 type LevelMode = "diagnostic" | "manual";
 
@@ -104,13 +104,7 @@ export default function NewTopicScreen() {
       className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Header */}
-      <View className="bg-indigo-600 px-6 pt-14 pb-6">
-        <View className="flex-row items-center gap-3">
-          <BackButton />
-          <Text className="text-white text-xl font-bold">New topic</Text>
-        </View>
-      </View>
+      <ScreenHeader title="New topic" />
 
       <ScrollView
         className="flex-1 bg-slate-50"

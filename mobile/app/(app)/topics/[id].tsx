@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { fetchTopic, generateBatch, type TopicDetail } from "@/lib/topics";
-import { BackButton } from "@/components/BackButton";
+import { ScreenHeader } from "@/components/ScreenHeader";
+import { capitalizeFirst } from "@/lib/utils";
 
 export default function TopicDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
@@ -46,20 +47,10 @@ export default function TopicDetailScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      {/* Header */}
-      <View className="bg-indigo-600 px-6 pt-14 pb-6 flex-row items-center gap-3">
-        <BackButton />
-        <View className="flex-1">
-          <Text className="text-white text-xl font-bold" numberOfLines={1}>
-            {topic?.title ?? " "}
-          </Text>
-          {topic && (
-            <Text className="text-indigo-300 text-xs capitalize">
-              {topic.domain}
-            </Text>
-          )}
-        </View>
-      </View>
+      <ScreenHeader
+        title={topic?.title ?? ' '}
+        subtitle={topic ? capitalizeFirst(topic.domain) : undefined}
+      />
 
       {/* Body */}
       {loading ? (

@@ -17,7 +17,8 @@ import {
   type SessionQuestion,
   type SessionResult,
 } from "@/lib/sessions";
-import { BackButton } from "@/components/BackButton";
+import { ScreenHeader } from "@/components/ScreenHeader";
+import { SessionCompletion } from "@/components/SessionCompletion";
 
 type Phase = "loading" | "question" | "reveal" | "complete";
 
@@ -118,12 +119,9 @@ export default function SessionScreen() {
   if (phase === "loading" || !question) {
     return (
       <View className="flex-1 bg-slate-50">
-        <View className="bg-indigo-600 px-6 pt-14 pb-5 flex-row items-center gap-3">
-          <BackButton />
-          <Text className="text-white text-xl font-bold">Practice</Text>
-        </View>
+        <ScreenHeader title="Practice" />
         {phase === "complete" ? (
-          <CompletionScreen results={results} onBack={() => router.back()} />
+          <SessionCompletion results={results} onBack={() => router.back()} />
         ) : (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#6366f1" />
@@ -136,11 +134,8 @@ export default function SessionScreen() {
   if (phase === "complete") {
     return (
       <View className="flex-1 bg-slate-50">
-        <View className="bg-indigo-600 px-6 pt-14 pb-5 flex-row items-center gap-3">
-          <BackButton />
-          <Text className="text-white text-xl font-bold">Practice</Text>
-        </View>
-        <CompletionScreen results={results} onBack={() => router.back()} />
+        <ScreenHeader title="Practice" />
+        <SessionCompletion results={results} onBack={() => router.back()} />
       </View>
     );
   }
@@ -152,21 +147,11 @@ export default function SessionScreen() {
       className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Header */}
-      <View className="bg-indigo-600 px-6 pt-14 pb-5">
-        <View className="flex-row items-center gap-3 mb-4">
-          <BackButton />
-          <Text className="text-white font-semibold flex-1">
-            Question {currentIdx + 1} of {questions.length}
-          </Text>
-        </View>
+      <ScreenHeader title={`Question ${currentIdx + 1} of ${questions.length}`}>
         <View className="h-1.5 bg-indigo-500 rounded-full">
-          <View
-            className="h-1.5 bg-white rounded-full"
-            style={{ width: `${progressPct}%` }}
-          />
+          <View className="h-1.5 bg-white rounded-full" style={{ width: `${progressPct}%` }} />
         </View>
-      </View>
+      </ScreenHeader>
 
       <ScrollView
         className="flex-1 bg-slate-50"
@@ -292,60 +277,3 @@ export default function SessionScreen() {
   );
 }
 
-function CompletionScreen({
-  results,
-  onBack,
-}: {
-  results: SessionResult | null;
-  onBack: () => void;
-}) {
-  return (
-    <View className="flex-1 items-center justify-center px-6 gap-4">
-      <Text className="text-5xl">🎉</Text>
-      <Text className="text-3xl font-bold text-slate-900">
-        {results ? `${results.accuracy_pct}%` : "Done!"}
-      </Text>
-      <Text className="text-base text-slate-500">Session complete</Text>
-
-      {results && (
-        <View className="bg-white border border-slate-100 rounded-2xl p-5 w-full gap-3 mt-2">
-          <ResultRow
-            label="Correct"
-            value={results.correct}
-            color="text-emerald-600"
-          />
-          <ResultRow label="Wrong" value={results.wrong} color="text-red-500" />
-          <ResultRow
-            label="Skipped"
-            value={results.skipped}
-            color="text-slate-400"
-          />
-        </View>
-      )}
-
-      <Pressable
-        className="bg-indigo-600 rounded-2xl py-4 px-10 mt-2 active:bg-indigo-700"
-        onPress={onBack}
-      >
-        <Text className="text-white font-semibold">Back to topic</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function ResultRow({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <View className="flex-row justify-between items-center">
-      <Text className="text-sm text-slate-600">{label}</Text>
-      <Text className={`text-sm font-bold ${color}`}>{value}</Text>
-    </View>
-  );
-}

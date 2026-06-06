@@ -107,12 +107,53 @@ mobile/
 - Everything else (components, stores, lib) uses **named exports**.
 - New API calls go in `lib/` as typed wrappers — never call `api` (Axios) directly from a component.
 
+## Component Extraction
+
+Route files must stay thin. They own screen-level state, data-fetching, and navigation — not UI markup.
+
+**Extract to `components/` when any of these are true:**
+- The piece has its own props interface.
+- It contains more than a few lines of JSX.
+- It could be reused on another screen (even hypothetically).
+
+**A local function component defined inside a route file is always a signal to extract it.**
+
+```tsx
+// wrong — TopicCard defined inline inside the route file
+export default function TopicsScreen() { ... }
+function TopicCard({ topic }: { topic: Topic }) { ... }   // ← move this out
+
+// correct
+// components/TopicCard.tsx  ← lives here
+// app/(app)/topics/index.tsx imports it
+import { TopicCard } from '@/components/TopicCard';
+```
+
+Pure helper functions with no JSX (date formatting, emoji mapping, colour logic) go in `lib/utils.ts`, not in the route file.
+
 ## TypeScript
 
 - Define explicit interfaces for all API response shapes and component props.
 - Prefer `interface` over `type` for props and API types.
 - No `any`. Use `unknown` and narrow it if the shape is truly unknown.
 - Use `enum` for any set of named string/numeric constants (status values, roles, event types, etc.). Export the enum from `lib/` and import it wherever the values are used — never re-declare the same string literals in multiple places.
+
+**Enums and typed unions over plain strings — always.**
+
+When a prop, state variable, or function parameter accepts one of a fixed set of values, define an `enum` (or a `type` union of string literals). Never widen the type to `string` or pass bare string literals at call sites.
+
+```tsx
+// wrong
+function StatusBadge({ status }: { status: string }) { ... }
+<StatusBadge status="archived" />
+
+// correct — enum lives in lib/topics.ts, imported everywhere
+enum TopicStatus { Active = 'active', Archived = 'archived' }
+function StatusBadge({ status }: { status: TopicStatus }) { ... }
+<StatusBadge status={TopicStatus.Archived} />
+```
+
+This applies to: component variant/mode props, API payload fields, Zustand state, and any switch/if-chain that branches on a string value.
 
 ## State Management
 
