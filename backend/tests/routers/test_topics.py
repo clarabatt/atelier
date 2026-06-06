@@ -113,6 +113,15 @@ def test_get_topic_has_batch_flag_false(client: TestClient, session: Session, se
     assert r.json()["topic"]["has_batch"] is False
 
 
+def test_get_topic_includes_status(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    r = client.get(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 200
+    assert "status" in r.json()["topic"]
+    assert r.json()["topic"]["status"] == topic.status.value
+
+
 # ---------------------------------------------------------------------------
 # Create topic
 # ---------------------------------------------------------------------------
@@ -316,6 +325,66 @@ def test_diagnostic_ai_error_returns_503(client: TestClient, session: Session, s
                 headers=_auth(session_cookie, user.id),
             )
     assert r.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Patch topic — edit title / domain
+# ---------------------------------------------------------------------------
+
+def test_patch_topic_updates_title(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, title="Old Title")
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"title": "New Title"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 200
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.title == "New Title"
+
+
+def test_patch_topic_updates_domain(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, domain="Old Domain")
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"domain": "New Domain"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 200
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.domain == "New Domain"
+
+
+def test_patch_topic_blank_title_rejected(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"title": "   "},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
+
+
+def test_patch_topic_blank_domain_rejected(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"domain": ""},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
 
 
 # ---------------------------------------------------------------------------
