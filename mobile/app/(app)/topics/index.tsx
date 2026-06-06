@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
   Pressable,
   Text,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { fetchTopics, type Topic } from '@/lib/topics';
+import { archiveTopic, deleteTopic, fetchTopics, type Topic } from '@/lib/topics';
 
 function formatDate(iso: string | null): string {
   if (!iso) return 'No activity yet';
@@ -18,18 +20,40 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function TopicCard({ topic }: { topic: Topic }) {
+interface TopicCardProps {
+  topic: Topic;
+  onArchive: (id: string, status: 'active' | 'archived') => void;
+  onDelete: (id: string, title: string) => void;
+}
+
+function TopicCard({ topic, onArchive, onDelete }: TopicCardProps) {
+  const [menuVisible, setMenuVisible] = useState(false);
+
   return (
     <Pressable
       className="bg-white rounded-2xl p-5 mb-3 border border-slate-100 active:bg-slate-50"
       onPress={() => router.push(`/topics/${topic.id}`)}
     >
       <View className="flex-row items-start justify-between mb-2">
-        <Text className="text-base font-semibold text-slate-900 flex-1 mr-3" numberOfLines={2}>
-          {topic.title}
-        </Text>
-        <View className="bg-indigo-50 rounded-lg px-2.5 py-1">
-          <Text className="text-xs font-medium text-indigo-600 capitalize">{topic.domain}</Text>
+        <View className="flex-1 mr-2">
+          <Text className="text-base font-semibold text-slate-900" numberOfLines={2}>
+            {topic.title}
+          </Text>
+          {topic.status === 'archived' && (
+            <Text className="text-xs text-slate-400 mt-0.5">Archived</Text>
+          )}
+        </View>
+        <View className="flex-row items-center gap-2">
+          <View className="bg-indigo-50 rounded-lg px-2.5 py-1">
+            <Text className="text-xs font-medium text-indigo-600 capitalize">{topic.domain}</Text>
+          </View>
+          <Pressable
+            className="w-7 h-7 items-center justify-center rounded-full active:bg-slate-100"
+            onPress={() => setMenuVisible(true)}
+            hitSlop={8}
+          >
+            <Text className="text-slate-400 text-lg leading-none">⋮</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -50,19 +74,49 @@ function TopicCard({ topic }: { topic: Topic }) {
         </View>
         <Text className="text-xs text-slate-400">{formatDate(topic.last_activity_at)}</Text>
       </View>
+
+      <Modal transparent animationType="fade" visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
+        <Pressable className="flex-1 bg-black/20" onPress={() => setMenuVisible(false)}>
+          <View className="absolute right-6 top-1/3 bg-white rounded-2xl shadow-lg overflow-hidden min-w-44">
+            <Pressable
+              className="px-5 py-4 active:bg-slate-50"
+              onPress={() => {
+                setMenuVisible(false);
+                onArchive(topic.id, topic.status === 'archived' ? 'active' : 'archived');
+              }}
+            >
+              <Text className="text-sm text-slate-800">
+                {topic.status === 'archived' ? 'Unarchive' : 'Archive'}
+              </Text>
+            </Pressable>
+            <View className="h-px bg-slate-100" />
+            <Pressable
+              className="px-5 py-4 active:bg-red-50"
+              onPress={() => {
+                setMenuVisible(false);
+                onDelete(topic.id, topic.title);
+              }}
+            >
+              <Text className="text-sm text-red-600">Delete</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </Pressable>
   );
 }
 
-function EmptyState() {
+function EmptyState({ showArchived }: { showArchived: boolean }) {
   return (
     <View className="flex-1 items-center justify-center px-8 gap-4">
       <Text className="text-4xl">📚</Text>
       <Text className="text-xl font-semibold text-slate-900 text-center">
-        No topics yet
+        {showArchived ? 'No topics yet' : 'No active topics'}
       </Text>
       <Text className="text-sm text-slate-500 text-center leading-relaxed">
-        Create your first study topic and let AI build a personalised learning path for you.
+        {showArchived
+          ? 'Create your first study topic and let AI build a personalised learning path for you.'
+          : 'All your topics are archived. Toggle "Show archived" to see them.'}
       </Text>
     </View>
   );
@@ -72,13 +126,49 @@ export default function TopicsScreen() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
-  useEffect(() => {
-    fetchTopics()
+  function load() {
+    setLoading(true);
+    setError(null);
+    fetchTopics(showArchived)
       .then(setTopics)
       .catch(() => setError('Could not load topics. Pull down to retry.'))
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { load(); }, [showArchived]);
+
+  async function handleArchive(id: string, newStatus: 'active' | 'archived') {
+    try {
+      await archiveTopic(id, newStatus);
+      load();
+    } catch {
+      Alert.alert('Error', 'Could not update topic status. Please try again.');
+    }
+  }
+
+  function handleDelete(id: string, title: string) {
+    Alert.alert(
+      'Delete topic?',
+      `This will permanently delete "${title}" and all its questions, sessions, and stats. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTopic(id);
+              load();
+            } catch {
+              Alert.alert('Error', 'Could not delete topic. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -92,6 +182,18 @@ export default function TopicsScreen() {
         </Pressable>
       </View>
 
+      <Pressable
+        className="mx-6 mb-3 flex-row items-center gap-2"
+        onPress={() => setShowArchived((v) => !v)}
+      >
+        <View
+          className={`w-4 h-4 rounded border ${showArchived ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'} items-center justify-center`}
+        >
+          {showArchived && <Text className="text-white text-xs leading-none">✓</Text>}
+        </View>
+        <Text className="text-sm text-slate-500">Show archived</Text>
+      </Pressable>
+
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#6366f1" />
@@ -104,9 +206,11 @@ export default function TopicsScreen() {
         <FlatList
           data={topics}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <TopicCard topic={item} />}
+          renderItem={({ item }) => (
+            <TopicCard topic={item} onArchive={handleArchive} onDelete={handleDelete} />
+          )}
           contentContainerClassName="px-6 pb-8 flex-grow"
-          ListEmptyComponent={<EmptyState />}
+          ListEmptyComponent={<EmptyState showArchived={showArchived} />}
           showsVerticalScrollIndicator={false}
         />
       )}
