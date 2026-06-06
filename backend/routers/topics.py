@@ -241,6 +241,8 @@ def _save_batch(topic: Topic, db: Session) -> Batch:
             position=i + 1,
         ))
 
+    topic.status = TopicStatus.active
+    db.add(topic)
     db.commit()
     db.refresh(batch)
     return batch

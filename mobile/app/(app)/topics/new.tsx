@@ -10,19 +10,27 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { createTopic, type TopicLevel } from "@/lib/topics";
+import { createTopic, TopicLevel } from "@/lib/topics";
 import { ModeCard } from "@/components/ModeCard";
 
 type LevelMode = "diagnostic" | "manual";
 
 const LEVELS: { value: TopicLevel; label: string; description: string }[] = [
-  { value: "beginner", label: "Beginner", description: "New to this topic" },
   {
-    value: "intermediate",
-    label: "Intermediate",
+    value: TopicLevel.Beginner,
+    label: TopicLevel.Beginner,
+    description: "New to this topic",
+  },
+  {
+    value: TopicLevel.Intermediate,
+    label: TopicLevel.Intermediate,
     description: "Know the basics",
   },
-  { value: "advanced", label: "Advanced", description: "Solid foundation" },
+  {
+    value: TopicLevel.Advanced,
+    label: TopicLevel.Advanced,
+    description: "Solid foundation",
+  },
 ];
 
 export default function NewTopicScreen() {
@@ -82,7 +90,7 @@ export default function NewTopicScreen() {
           >
             <Text
               className="text-white text-xl leading-none"
-              style={{ marginTop: -1 }}
+              style={{ marginTop: -5 }}
             >
               ‹
             </Text>
@@ -242,9 +250,7 @@ export default function NewTopicScreen() {
             <ActivityIndicator size="small" color="white" />
           ) : (
             <Text className="text-white text-base font-semibold">
-              {levelMode === "manual"
-                ? "Create topic"
-                : "Create & start diagnostic"}
+              Generate questions
             </Text>
           )}
         </Pressable>

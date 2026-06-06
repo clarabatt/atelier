@@ -112,6 +112,7 @@ mobile/
 - Define explicit interfaces for all API response shapes and component props.
 - Prefer `interface` over `type` for props and API types.
 - No `any`. Use `unknown` and narrow it if the shape is truly unknown.
+- Use `enum` for any set of named string/numeric constants (status values, roles, event types, etc.). Export the enum from `lib/` and import it wherever the values are used — never re-declare the same string literals in multiple places.
 
 ## State Management
 

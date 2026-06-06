@@ -8,6 +8,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 
 class TopicStatus(str, Enum):
+    not_started = "not_started"
     active = "active"
     archived = "archived"
 
@@ -67,7 +68,7 @@ class Topic(SQLModel, table=True):
     title: str
     domain: str
     ai_level_summary: Optional[str] = None
-    status: TopicStatus = Field(default=TopicStatus.active)
+    status: TopicStatus = Field(default=TopicStatus.not_started)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: Optional[User] = Relationship(back_populates="topics")

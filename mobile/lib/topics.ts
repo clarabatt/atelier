@@ -1,23 +1,32 @@
-import { api } from '@/lib/api';
+import { api } from "@/lib/api";
+
+export enum TopicStatus {
+  NotStarted = "not_started",
+  Active = "active",
+  Archived = "archived",
+}
 
 export interface Topic {
   id: string;
   title: string;
   domain: string;
-  status: 'active' | 'archived';
+  status: TopicStatus;
   accuracy_pct: number;
   last_activity_at: string | null;
   created_at: string;
 }
 
 export async function fetchTopics(includeArchived = false): Promise<Topic[]> {
-  const { data } = await api.get<{ topics: Topic[] }>('/api/topics', {
+  const { data } = await api.get<{ topics: Topic[] }>("/api/topics", {
     params: includeArchived ? { include_archived: true } : undefined,
   });
   return data.topics;
 }
 
-export async function archiveTopic(id: string, status: 'active' | 'archived'): Promise<void> {
+export async function archiveTopic(
+  id: string,
+  status: TopicStatus,
+): Promise<void> {
   await api.patch(`/api/topics/${id}`, { status });
 }
 
@@ -37,7 +46,9 @@ export interface TopicDetail {
 }
 
 export async function generateBatch(topicId: string): Promise<void> {
-  await api.post(`/api/topics/${topicId}/batches`, undefined, { timeout: 120_000 });
+  await api.post(`/api/topics/${topicId}/batches`, undefined, {
+    timeout: 120_000,
+  });
 }
 
 export async function fetchTopic(id: string): Promise<TopicDetail> {
@@ -53,23 +64,36 @@ export interface NewTopic {
   created_at: string;
 }
 
-export type TopicLevel = 'beginner' | 'intermediate' | 'advanced';
+export enum TopicLevel {
+  Beginner = "beginner",
+  Intermediate = "intermediate",
+  Advanced = "advanced",
+}
 
 export async function createTopic(
   title: string,
   domain: string,
   initial_level?: TopicLevel,
 ): Promise<NewTopic> {
-  const { data } = await api.post<{ topic: NewTopic }>('/api/topics', {
-    title,
-    domain,
-    ...(initial_level ? { initial_level } : {}),
-  }, { timeout: initial_level ? 120_000 : 10_000 });
+  const { data } = await api.post<{ topic: NewTopic }>(
+    "/api/topics",
+    {
+      title,
+      domain,
+      ...(initial_level ? { initial_level } : {}),
+    },
+    { timeout: initial_level ? 120_000 : 10_000 },
+  );
   return data.topic;
 }
 
+export enum DiagnosticRole {
+  User = "user",
+  Assistant = "assistant",
+}
+
 export interface DiagnosticMessage {
-  role: 'user' | 'assistant';
+  role: DiagnosticRole;
   content: string;
 }
 
