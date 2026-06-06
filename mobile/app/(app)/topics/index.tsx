@@ -40,7 +40,7 @@ function TopicCard({ topic, onArchive, onDelete }: TopicCardProps) {
 
   function renderLeftActions() {
     return (
-      <View className="bg-red-500 justify-center items-end px-6 rounded-2xl mb-3 mr-2">
+      <View className="bg-red-500 w-24 justify-center items-center rounded-2xl mb-3 mr-2">
         <Text className="text-white text-sm font-semibold">Delete</Text>
       </View>
     );
@@ -48,7 +48,7 @@ function TopicCard({ topic, onArchive, onDelete }: TopicCardProps) {
 
   function renderRightActions() {
     return (
-      <View className="bg-amber-400 justify-center items-start px-6 rounded-2xl mb-3 ml-2">
+      <View className="bg-amber-400 w-28 justify-center items-center rounded-2xl mb-3 ml-2">
         <Text className="text-white text-sm font-semibold">{archiveLabel}</Text>
       </View>
     );
@@ -61,11 +61,13 @@ function TopicCard({ topic, onArchive, onDelete }: TopicCardProps) {
       renderRightActions={renderRightActions}
       onSwipeableOpen={(direction) => {
         swipeRef.current?.close();
-        if (direction === "left") {
-          onDelete(topic.id, topic.title);
-        } else {
-          onArchive(topic.id, archiveStatus);
-        }
+        setTimeout(() => {
+          if (direction === "left") {
+            onDelete(topic.id, topic.title);
+          } else {
+            onArchive(topic.id, archiveStatus);
+          }
+        }, 50);
       }}
       friction={2}
       leftThreshold={80}

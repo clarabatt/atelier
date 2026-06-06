@@ -116,9 +116,9 @@ export default function DiagnosticChatScreen() {
             </Text>
             <Pressable
               className="bg-indigo-600 rounded-xl px-6 py-3 mt-1 active:bg-indigo-700"
-              onPress={() => router.replace(`/topics/${topicId}`)}
+              onPress={() => router.replace(`/topics/${topicId}?from=diagnostic`)}
             >
-              <Text className="text-white font-semibold text-sm">Start practising</Text>
+              <Text className="text-white font-semibold text-sm">See my results</Text>
             </Pressable>
           </View>
         )}

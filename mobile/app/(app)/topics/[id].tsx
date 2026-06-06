@@ -4,8 +4,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { fetchTopic, generateBatch, type TopicDetail } from '@/lib/topics';
 
 export default function TopicDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const topicId = Array.isArray(id) ? id[0] : id;
+  const showLevelCard = from === "diagnostic";
 
   const [topic, setTopic] = useState<TopicDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,8 @@ export default function TopicDetailScreen() {
       .then((t) => {
         if (t.ai_level_summary === null) {
           router.replace(`/topics/${topicId}/chat`);
+        } else if (t.has_batch && !showLevelCard) {
+          router.replace(`/topics/${topicId}/session`);
         } else {
           setTopic(t);
         }
@@ -73,15 +76,17 @@ export default function TopicDetailScreen() {
         </View>
       ) : (
         <View className="px-5 pt-5 gap-4">
-          {/* Level summary */}
-          <View className="bg-white border border-slate-100 rounded-2xl p-5 gap-2">
-            <Text className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
-              Your level
-            </Text>
-            <Text className="text-sm text-slate-700 leading-relaxed">
-              {topic.ai_level_summary}
-            </Text>
-          </View>
+          {/* Level summary — only shown after completing the diagnostic */}
+          {showLevelCard && (
+            <View className="bg-white border border-slate-100 rounded-2xl p-5 gap-2">
+              <Text className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
+                Your level
+              </Text>
+              <Text className="text-sm text-slate-700 leading-relaxed">
+                {topic.ai_level_summary}
+              </Text>
+            </View>
+          )}
 
           {/* Batch state */}
           {topic.has_batch ? (
