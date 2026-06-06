@@ -72,6 +72,7 @@ async def get_topic(
             "id": str(topic.id),
             "title": topic.title,
             "domain": topic.domain,
+            "status": topic.status,
             "ai_level_summary": topic.ai_level_summary,
             "has_batch": batch is not None,
             "accuracy_pct": stats.accuracy_pct if stats else 0.0,
@@ -126,9 +127,14 @@ async def patch_topic(
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    topic.status = TopicStatus(body.status)
+    if body.status is not None:
+        topic.status = TopicStatus(body.status)
+    if body.title is not None:
+        topic.title = body.title
+    if body.domain is not None:
+        topic.domain = body.domain
     TopicRepository(db).update(topic)
-    return {"id": str(topic.id), "status": topic.status}
+    return {"id": str(topic.id), "status": topic.status, "title": topic.title, "domain": topic.domain}
 
 
 @router.delete("/{topic_id}", status_code=204)

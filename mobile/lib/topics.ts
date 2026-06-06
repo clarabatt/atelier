@@ -30,6 +30,13 @@ export async function archiveTopic(
   await api.patch(`/api/topics/${id}`, { status });
 }
 
+export async function updateTopic(
+  id: string,
+  patch: { title?: string; domain?: string },
+): Promise<void> {
+  await api.patch(`/api/topics/${id}`, patch);
+}
+
 export async function deleteTopic(id: string): Promise<void> {
   await api.delete(`/api/topics/${id}`);
 }
@@ -38,6 +45,7 @@ export interface TopicDetail {
   id: string;
   title: string;
   domain: string;
+  status: TopicStatus;
   ai_level_summary: string | null;
   has_batch: boolean;
   accuracy_pct: number;

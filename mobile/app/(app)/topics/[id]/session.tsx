@@ -121,7 +121,7 @@ export default function SessionScreen() {
       <View className="flex-1 bg-slate-50">
         <ScreenHeader title="Practice" />
         {phase === "complete" ? (
-          <SessionCompletion results={results} onBack={() => router.back()} />
+          <SessionCompletion results={results} onBack={() => router.replace(`/topics/${topicId}`)} />
         ) : (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color="#6366f1" />
@@ -135,7 +135,7 @@ export default function SessionScreen() {
     return (
       <View className="flex-1 bg-slate-50">
         <ScreenHeader title="Practice" />
-        <SessionCompletion results={results} onBack={() => router.back()} />
+        <SessionCompletion results={results} onBack={() => router.replace(`/topics/${topicId}`)} />
       </View>
     );
   }

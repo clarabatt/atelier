@@ -43,7 +43,19 @@ class NewTopicRequest(BaseModel):
 
 
 class PatchTopicRequest(BaseModel):
-    status: TopicStatusLiteral
+    status: Optional[TopicStatusLiteral] = None
+    title: Optional[str] = None
+    domain: Optional[str] = None
+
+    @field_validator("title", "domain")
+    @classmethod
+    def not_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
 
 
 class DiagnosticMessage(BaseModel):

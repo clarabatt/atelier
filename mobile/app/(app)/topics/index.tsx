@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   Text,
   View,
 } from "react-native";
 import { router } from "expo-router";
-import {
-  TopicStatus,
-  archiveTopic,
-  deleteTopic,
-  fetchTopics,
-  type Topic,
-} from "@/lib/topics";
+import { fetchTopics, type Topic } from "@/lib/topics";
 import { TopicCard } from "@/components/TopicCard";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -36,37 +29,6 @@ export default function TopicsScreen() {
   useEffect(() => {
     load();
   }, [showArchived]);
-
-  async function handleArchive(id: string, newStatus: TopicStatus) {
-    try {
-      await archiveTopic(id, newStatus);
-      load();
-    } catch {
-      Alert.alert("Error", "Could not update topic status. Please try again.");
-    }
-  }
-
-  function handleDelete(id: string, title: string) {
-    Alert.alert(
-      "Delete topic?",
-      `This will permanently delete "${title}" and all its questions, sessions, and stats. This cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteTopic(id);
-              load();
-            } catch {
-              Alert.alert("Error", "Could not delete topic. Please try again.");
-            }
-          },
-        },
-      ],
-    );
-  }
 
   return (
     <View className="flex-1 bg-slate-50">
@@ -106,13 +68,7 @@ export default function TopicsScreen() {
         <FlatList
           data={topics}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TopicCard
-              topic={item}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-            />
-          )}
+          renderItem={({ item }) => <TopicCard topic={item} />}
           contentContainerClassName="px-6 pb-8 flex-grow"
           ListEmptyComponent={<EmptyState showArchived={showArchived} />}
           showsVerticalScrollIndicator={false}
