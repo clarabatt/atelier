@@ -7,6 +7,11 @@ from sqlalchemy import Column, JSON
 from sqlmodel import Field, Relationship, SQLModel
 
 
+class TopicStatus(str, Enum):
+    active = "active"
+    archived = "archived"
+
+
 class BatchStatus(str, Enum):
     active = "active"
     completed = "completed"
@@ -62,6 +67,7 @@ class Topic(SQLModel, table=True):
     title: str
     domain: str
     ai_level_summary: Optional[str] = None
+    status: TopicStatus = Field(default=TopicStatus.active)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: Optional[User] = Relationship(back_populates="topics")

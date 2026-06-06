@@ -2,6 +2,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
 
+TopicStatusLiteral = Literal["active", "archived"]
+
 Level = Literal["beginner", "intermediate", "advanced"]
 
 _LEVEL_SUMMARIES: dict[str, str] = {
@@ -28,6 +30,10 @@ class NewTopicRequest(BaseModel):
         if self.initial_level is None:
             return None
         return _LEVEL_SUMMARIES[self.initial_level]
+
+
+class PatchTopicRequest(BaseModel):
+    status: TopicStatusLiteral
 
 
 class DiagnosticMessage(BaseModel):

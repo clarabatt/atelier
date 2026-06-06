@@ -316,3 +316,153 @@ def test_diagnostic_ai_error_returns_503(client: TestClient, session: Session, s
                 headers=_auth(session_cookie, user.id),
             )
     assert r.status_code == 503
+
+
+# ---------------------------------------------------------------------------
+# Patch topic (archive / unarchive) — AT-027
+# ---------------------------------------------------------------------------
+
+def test_patch_topic_archive(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "archived"
+
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.status.value == "archived"
+
+
+def test_patch_topic_archived_hidden_from_default_list(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    TopicFactory.create(session, user.id, title="Active Topic")
+    archived = TopicFactory.create(session, user.id, title="Archived Topic")
+
+    client.patch(
+        f"/api/topics/{archived.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    titles = {t["title"] for t in r.json()["topics"]}
+    assert "Active Topic" in titles
+    assert "Archived Topic" not in titles
+
+
+def test_patch_topic_include_archived_returns_all(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    TopicFactory.create(session, user.id, title="Active")
+    archived = TopicFactory.create(session, user.id, title="Archived")
+
+    client.patch(
+        f"/api/topics/{archived.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    r = client.get("/api/topics?include_archived=true", headers=_auth(session_cookie, user.id))
+    titles = {t["title"] for t in r.json()["topics"]}
+    assert "Active" in titles
+    assert "Archived" in titles
+
+
+def test_patch_topic_unarchive_returns_to_list(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, title="My Topic")
+
+    client.patch(f"/api/topics/{topic.id}", json={"status": "archived"}, headers=_auth(session_cookie, user.id))
+    client.patch(f"/api/topics/{topic.id}", json={"status": "active"}, headers=_auth(session_cookie, user.id))
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    titles = [t["title"] for t in r.json()["topics"]]
+    assert "My Topic" in titles
+
+
+def test_patch_topic_wrong_user_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    owner = UserFactory.create(session)
+    requester = UserFactory.create(session)
+    topic = TopicFactory.create(session, owner.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"status": "archived"},
+        headers=_auth(session_cookie, requester.id),
+    )
+    assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Delete topic permanently — AT-028
+# ---------------------------------------------------------------------------
+
+def test_delete_topic_returns_204(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 204
+
+
+def test_delete_topic_removes_from_db(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+
+    assert TopicRepository(session).get_by_id(topic.id) is None
+
+
+def test_delete_topic_cascades_batches_and_questions(client: TestClient, session: Session, session_cookie) -> None:
+    from backend.database.repositories import BatchRepository
+
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    QuestionFactory.create(session, batch.id)
+
+    client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+
+    assert BatchRepository(session).get_by_id(batch.id) is None
+
+
+def test_delete_topic_cascades_sessions_and_attempts(client: TestClient, session: Session, session_cookie) -> None:
+    from backend.database.models import Attempt, AttemptStatus
+    from backend.database.repositories import StudySessionRepository
+    from backend.tests.factories import StudySessionFactory
+
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    batch = BatchFactory.create(session, topic.id)
+    question = QuestionFactory.create(session, batch.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id)
+    attempt = Attempt(
+        user_id=user.id, question_id=question.id, session_id=study_session.id, status=AttemptStatus.correct
+    )
+    session.add(attempt)
+    session.commit()
+
+    client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+
+    assert StudySessionRepository(session).get_by_id(study_session.id) is None
+
+
+def test_delete_topic_not_found(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    r = client.delete(f"/api/topics/{uuid.uuid4()}", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 404
+
+
+def test_delete_topic_wrong_user_gets_404(client: TestClient, session: Session, session_cookie) -> None:
+    owner = UserFactory.create(session)
+    requester = UserFactory.create(session)
+    topic = TopicFactory.create(session, owner.id)
+
+    r = client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, requester.id))
+    assert r.status_code == 404
+    assert TopicRepository(session).get_by_id(topic.id) is not None
