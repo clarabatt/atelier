@@ -113,6 +113,15 @@ def test_get_topic_has_batch_flag_false(client: TestClient, session: Session, se
     assert r.json()["topic"]["has_batch"] is False
 
 
+def test_get_topic_includes_status(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+    r = client.get(f"/api/topics/{topic.id}", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 200
+    assert "status" in r.json()["topic"]
+    assert r.json()["topic"]["status"] == topic.status.value
+
+
 # ---------------------------------------------------------------------------
 # Create topic
 # ---------------------------------------------------------------------------
@@ -319,6 +328,66 @@ def test_diagnostic_ai_error_returns_503(client: TestClient, session: Session, s
 
 
 # ---------------------------------------------------------------------------
+# Patch topic — edit title / domain
+# ---------------------------------------------------------------------------
+
+def test_patch_topic_updates_title(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, title="Old Title")
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"title": "New Title"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 200
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.title == "New Title"
+
+
+def test_patch_topic_updates_domain(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, domain="Old Domain")
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"domain": "New Domain"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 200
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.domain == "New Domain"
+
+
+def test_patch_topic_blank_title_rejected(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"title": "   "},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
+
+
+def test_patch_topic_blank_domain_rejected(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    r = client.patch(
+        f"/api/topics/{topic.id}",
+        json={"domain": ""},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Patch topic (archive / unarchive) — AT-027
 # ---------------------------------------------------------------------------
 
@@ -466,3 +535,96 @@ def test_delete_topic_wrong_user_gets_404(client: TestClient, session: Session, 
     r = client.delete(f"/api/topics/{topic.id}", headers=_auth(session_cookie, requester.id))
     assert r.status_code == 404
     assert TopicRepository(session).get_by_id(topic.id) is not None
+
+
+# ---------------------------------------------------------------------------
+# not_started status — AT-0002
+# ---------------------------------------------------------------------------
+
+def test_new_topic_defaults_to_not_started(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id)
+
+    assert topic.status.value == "not_started"
+
+    r = client.get("/api/topics", headers=_auth(session_cookie, user.id))
+    ids = [t["id"] for t in r.json()["topics"]]
+    assert str(topic.id) in ids
+
+
+def test_batch_creation_transitions_topic_to_active(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="Beginner level")
+
+    with patch("backend.routers.topics.generate_batch", return_value=_fake_questions()):
+        client.post(f"/api/topics/{topic.id}/batches", headers=_auth(session_cookie, user.id))
+
+    persisted = TopicRepository(session).get_by_id(topic.id)
+    assert persisted.status.value == "active"
+
+
+# ---------------------------------------------------------------------------
+# question_formats — AT-0004
+# ---------------------------------------------------------------------------
+
+def test_create_topic_with_custom_formats_persists_to_db(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math", "question_formats": ["mcq"]},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 201
+    topic_id = r.json()["topic"]["id"]
+    persisted = TopicRepository(session).get_by_id(uuid.UUID(topic_id))
+    assert persisted.question_formats == ["mcq"]
+
+
+def test_create_topic_without_formats_defaults_to_all_three(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 201
+    topic_id = r.json()["topic"]["id"]
+    persisted = TopicRepository(session).get_by_id(uuid.UUID(topic_id))
+    assert persisted.question_formats == ["mcq", "written", "fill_blank"]
+
+
+def test_create_topic_empty_formats_returns_422(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math", "question_formats": []},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
+
+
+def test_batch_generation_passes_topic_formats_to_generate_batch(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(
+        session, user.id, ai_level_summary="beginner level", question_formats=["fill_blank"]
+    )
+
+    with patch("backend.routers.topics.generate_batch", return_value=_fake_questions()) as mock_gen:
+        r = client.post(f"/api/topics/{topic.id}/batches", headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 201
+    assert mock_gen.call_args.args[3] == ["fill_blank"]

@@ -1,6 +1,7 @@
 import '../global.css';
 import { useEffect } from 'react';
 import { Stack, router, useSegments, useRootNavigationState } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/stores/auth';
 
 function AuthGuard() {
@@ -34,12 +35,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <>
+    <GestureHandlerRootView className="flex-1">
       <AuthGuard />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 }

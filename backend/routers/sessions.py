@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime
 
@@ -5,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from backend.auth import get_current_user
-from backend.database.models import Attempt, AttemptStatus, StudySession, TopicStats, User
+from backend.database.models import Attempt, AttemptStatus, BatchStatus, StudySession, TopicStats, User
 from backend.database.repositories import (
     AttemptRepository,
     BatchRepository,
@@ -16,6 +17,8 @@ from backend.database.repositories import (
 )
 from backend.database.session import get_session
 from backend.schemas.sessions import AttemptRequest, StartSessionRequest
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -112,6 +115,9 @@ async def complete_session(
     if not session_obj or session_obj.user_id != user.id:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    threshold_passed = False
+    new_batch_generating = False
+
     if not session_obj.ended_at:
         session_obj.ended_at = datetime.utcnow()
         StudySessionRepository(db).update(session_obj)
@@ -120,12 +126,30 @@ async def complete_session(
         if batch:
             _update_stats(user.id, batch.topic_id, session_obj, db)
 
+            total_non_skipped = session_obj.correct_count + session_obj.wrong_count
+            accuracy = session_obj.correct_count / max(total_non_skipped, 1)
+            if total_non_skipped >= 20 and accuracy >= batch.threshold_pct / 100:
+                threshold_passed = True
+                batch.status = BatchStatus.completed
+                BatchRepository(db).update(batch)
+
+                topic = TopicRepository(db).get_by_id(batch.topic_id)
+                if topic:
+                    try:
+                        from backend.routers.topics import _save_batch  # noqa: PLC0415
+                        _save_batch(topic, db)
+                        new_batch_generating = True
+                    except Exception:
+                        logger.exception("New batch generation failed after threshold for topic %s", batch.topic_id)
+
     total = session_obj.correct_count + session_obj.wrong_count
     return {
         "correct": session_obj.correct_count,
         "wrong": session_obj.wrong_count,
         "skipped": session_obj.skipped_count,
         "accuracy_pct": round(session_obj.correct_count / max(total, 1) * 100),
+        "threshold_passed": threshold_passed,
+        "new_batch_generating": new_batch_generating,
     }
 
 

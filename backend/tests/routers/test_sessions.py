@@ -278,3 +278,78 @@ def test_complete_session_updates_existing_stats(client: TestClient, session: Se
     stats = TopicStatsRepository(session).get_by_user_and_topic(user.id, batch.topic_id)
     assert stats.total_answered == 20
     assert stats.accuracy_pct == 60.0
+
+
+# ---------------------------------------------------------------------------
+# Batch threshold — AT-009
+# ---------------------------------------------------------------------------
+
+def test_complete_session_below_threshold_no_batch_change(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="intermediate level")
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=10, wrong_count=10)
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["threshold_passed"] is False
+    assert body["new_batch_generating"] is False
+
+    persisted_batch = BatchRepository(session).get_by_id(batch.id)
+    assert persisted_batch.status.value == "active"
+
+
+def test_complete_session_too_few_answered_no_threshold(client: TestClient, session: Session, session_cookie) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="beginner level")
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=16, wrong_count=2)
+
+    r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+    body = r.json()
+    assert body["threshold_passed"] is False
+
+
+def test_complete_session_threshold_met_marks_batch_completed(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    from unittest.mock import patch
+
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="intermediate level")
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=17, wrong_count=3)
+
+    with patch("backend.routers.topics.generate_batch", return_value=[
+        {"body": f"Q{i}", "format": "mcq", "options": ["A","B","C","D"], "correct_answer": "A",
+         "reasoning": "r", "difficulty": 2} for i in range(20)
+    ]):
+        r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["threshold_passed"] is True
+    assert body["new_batch_generating"] is True
+
+    persisted_batch = BatchRepository(session).get_by_id(batch.id)
+    assert persisted_batch.status.value == "completed"
+
+
+def test_complete_session_threshold_batch_generation_failure_still_returns_200(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    from unittest.mock import patch
+
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(session, user.id, ai_level_summary="intermediate level")
+    batch = BatchFactory.create(session, topic.id)
+    study_session = StudySessionFactory.create(session, user.id, batch.id, correct_count=17, wrong_count=3)
+
+    with patch("backend.routers.topics.generate_batch", side_effect=RuntimeError("AI down")):
+        r = client.post(f"/api/sessions/{study_session.id}/complete", headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["threshold_passed"] is True
+    assert body["new_batch_generating"] is False

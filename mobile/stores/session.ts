@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { runDiagnostic, type DiagnosticMessage } from '@/lib/topics';
+import { DiagnosticRole, runDiagnostic, type DiagnosticMessage } from '@/lib/topics';
 
 interface DiagnosticStore {
   topicId: string | null;
@@ -25,10 +25,10 @@ export const useSessionStore = create<DiagnosticStore>((set, get) => ({
     set({ ...INITIAL, topicId, isLoading: true });
     try {
       const { message, is_final } = await runDiagnostic(topicId, []);
-      set({ messages: [{ role: 'assistant', content: message }], isLoading: false, isDone: is_final });
+      set({ messages: [{ role: DiagnosticRole.Assistant, content: message }], isLoading: false, isDone: is_final });
     } catch {
       set({
-        messages: [{ role: 'assistant', content: "Couldn't start the diagnostic. Please go back and try again." }],
+        messages: [{ role: DiagnosticRole.Assistant, content: "Couldn't start the diagnostic. Please go back and try again." }],
         isLoading: false,
       });
     }
@@ -38,19 +38,19 @@ export const useSessionStore = create<DiagnosticStore>((set, get) => ({
     const { topicId, messages } = get();
     if (!topicId || !content.trim()) return;
 
-    const updated: DiagnosticMessage[] = [...messages, { role: 'user', content: content.trim() }];
+    const updated: DiagnosticMessage[] = [...messages, { role: DiagnosticRole.User, content: content.trim() }];
     set({ messages: updated, isLoading: true });
 
     try {
       const { message, is_final } = await runDiagnostic(topicId, updated);
       set({
-        messages: [...updated, { role: 'assistant', content: message }],
+        messages: [...updated, { role: DiagnosticRole.Assistant, content: message }],
         isLoading: false,
         isDone: is_final,
       });
     } catch {
       set({
-        messages: [...updated, { role: 'assistant', content: "Something went wrong. Please try again." }],
+        messages: [...updated, { role: DiagnosticRole.Assistant, content: "Something went wrong. Please try again." }],
         isLoading: false,
       });
     }

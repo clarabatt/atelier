@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { fetchTopics, type Topic } from '@/lib/topics';
+import { UserAvatar } from '@/components/UserAvatar';
+import { domainEmoji } from '@/lib/utils';
 
 export default function HomeScreen() {
   const { user, logout } = useAuthStore();
@@ -26,10 +28,6 @@ export default function HomeScreen() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
-  const initials = user?.display_name
-    ? user.display_name.split(' ').slice(0, 2).map((w) => w[0].toUpperCase()).join('')
-    : '?';
-
   const recentTopics = topics
     .filter((t) => t.last_activity_at !== null)
     .sort((a, b) => new Date(b.last_activity_at!).getTime() - new Date(a.last_activity_at!).getTime())
@@ -42,21 +40,11 @@ export default function HomeScreen() {
       <View className="bg-indigo-600 px-6 pt-14 pb-12">
         <View className="flex-row items-start justify-between mb-3">
           <Text className="text-indigo-300 text-sm">{greeting}</Text>
-          <Pressable onPress={() => setMenuVisible(true)} hitSlop={8}>
-            {user?.picture_url ? (
-              <Image
-                source={{ uri: user.picture_url }}
-                style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
-              />
-            ) : (
-              <View
-                style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#818cf8' }}
-                className="bg-indigo-500 items-center justify-center"
-              >
-                <Text className="text-white text-sm font-bold">{initials}</Text>
-              </View>
-            )}
-          </Pressable>
+          <UserAvatar
+            pictureUrl={user?.picture_url}
+            displayName={user?.display_name}
+            onPress={() => setMenuVisible(true)}
+          />
         </View>
         <Text className="text-white text-3xl font-bold">
           {user?.display_name ?? 'there'} 👋
@@ -166,22 +154,3 @@ export default function HomeScreen() {
   );
 }
 
-function domainEmoji(domain: string): string {
-  const map: Record<string, string> = {
-    french: '🇫🇷',
-    spanish: '🇪🇸',
-    english: '🇬🇧',
-    history: '🏛️',
-    science: '🔬',
-    math: '📐',
-    maths: '📐',
-    music: '🎵',
-    art: '🎨',
-    geography: '🌍',
-    biology: '🧬',
-    chemistry: '⚗️',
-    physics: '⚡',
-    literature: '📖',
-  };
-  return map[domain.toLowerCase()] ?? '📝';
-}

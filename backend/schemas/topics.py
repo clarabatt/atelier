@@ -2,6 +2,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
 
+QuestionFormatLiteral = Literal["mcq", "written", "fill_blank"]
+
 TopicStatusLiteral = Literal["active", "archived"]
 
 Level = Literal["beginner", "intermediate", "advanced"]
@@ -17,6 +19,7 @@ class NewTopicRequest(BaseModel):
     title: str
     domain: str
     initial_level: Optional[Level] = None
+    question_formats: list[QuestionFormatLiteral] = ["mcq", "written", "fill_blank"]
 
     @field_validator("title", "domain")
     @classmethod
@@ -26,6 +29,13 @@ class NewTopicRequest(BaseModel):
             raise ValueError("must not be blank")
         return v
 
+    @field_validator("question_formats")
+    @classmethod
+    def at_least_one_format(cls, v: list) -> list:
+        if not v:
+            raise ValueError("at least one question format must be selected")
+        return v
+
     def level_summary(self) -> Optional[str]:
         if self.initial_level is None:
             return None
@@ -33,7 +43,19 @@ class NewTopicRequest(BaseModel):
 
 
 class PatchTopicRequest(BaseModel):
-    status: TopicStatusLiteral
+    status: Optional[TopicStatusLiteral] = None
+    title: Optional[str] = None
+    domain: Optional[str] = None
+
+    @field_validator("title", "domain")
+    @classmethod
+    def not_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be blank")
+        return v
 
 
 class DiagnosticMessage(BaseModel):

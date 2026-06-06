@@ -20,11 +20,10 @@ engine = create_engine(TEST_DATABASE_URL)
 
 @pytest.fixture(scope="session", autouse=True)
 def create_schema():
+    SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     yield
-    table_names = ", ".join(f'"{t.name}"' for t in SQLModel.metadata.sorted_tables)
-    with engine.begin() as conn:
-        conn.execute(text(f"DROP TABLE IF EXISTS {table_names} CASCADE"))
+    SQLModel.metadata.drop_all(engine)
 
 
 @pytest.fixture(autouse=True)

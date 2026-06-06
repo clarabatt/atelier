@@ -10,19 +10,34 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { createTopic, type TopicLevel } from "@/lib/topics";
+import { createTopic, TopicLevel, QuestionFormat } from "@/lib/topics";
 import { ModeCard } from "@/components/ModeCard";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 type LevelMode = "diagnostic" | "manual";
 
+const FORMAT_OPTIONS: { value: QuestionFormat; label: string }[] = [
+  { value: QuestionFormat.Mcq, label: "Multiple choice" },
+  { value: QuestionFormat.Written, label: "Written" },
+  { value: QuestionFormat.FillBlank, label: "Fill in the blank" },
+];
+
 const LEVELS: { value: TopicLevel; label: string; description: string }[] = [
-  { value: "beginner", label: "Beginner", description: "New to this topic" },
   {
-    value: "intermediate",
-    label: "Intermediate",
+    value: TopicLevel.Beginner,
+    label: TopicLevel.Beginner,
+    description: "New to this topic",
+  },
+  {
+    value: TopicLevel.Intermediate,
+    label: TopicLevel.Intermediate,
     description: "Know the basics",
   },
-  { value: "advanced", label: "Advanced", description: "Solid foundation" },
+  {
+    value: TopicLevel.Advanced,
+    label: TopicLevel.Advanced,
+    description: "Solid foundation",
+  },
 ];
 
 export default function NewTopicScreen() {
@@ -30,13 +45,27 @@ export default function NewTopicScreen() {
   const [domain, setDomain] = useState("");
   const [levelMode, setLevelMode] = useState<LevelMode | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<TopicLevel | null>(null);
+  const [selectedFormats, setSelectedFormats] = useState<Set<QuestionFormat>>(
+    new Set([QuestionFormat.Mcq, QuestionFormat.Written, QuestionFormat.FillBlank]),
+  );
   const [errors, setErrors] = useState<{
     title?: string;
     domain?: string;
     level?: string;
+    formats?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
   const domainRef = useRef<TextInput>(null);
+
+  function toggleFormat(fmt: QuestionFormat) {
+    if (selectedFormats.has(fmt) && selectedFormats.size === 1) return;
+    setSelectedFormats((prev) => {
+      const next = new Set(prev);
+      next.has(fmt) ? next.delete(fmt) : next.add(fmt);
+      return next;
+    });
+    if (errors.formats) setErrors((prev) => ({ ...prev, formats: undefined }));
+  }
 
   function validate(): boolean {
     const e: typeof errors = {};
@@ -44,6 +73,7 @@ export default function NewTopicScreen() {
     if (!domain.trim()) e.domain = "Domain is required";
     if (!levelMode) e.level = "Choose how to set your level";
     if (levelMode === "manual" && !selectedLevel) e.level = "Pick a level";
+    if (selectedFormats.size === 0) e.formats = "Select at least one type";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -56,6 +86,7 @@ export default function NewTopicScreen() {
         title.trim(),
         domain.trim(),
         levelMode === "manual" ? selectedLevel! : undefined,
+        [...selectedFormats],
       );
       if (levelMode === "manual") {
         router.replace(`/topics/${topic.id}`);
@@ -73,23 +104,7 @@ export default function NewTopicScreen() {
       className="flex-1"
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Header */}
-      <View className="bg-indigo-600 px-6 pt-14 pb-6">
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            className="w-8 h-8 rounded-full bg-indigo-500 items-center justify-center active:bg-indigo-400"
-            onPress={() => router.back()}
-          >
-            <Text
-              className="text-white text-xl leading-none"
-              style={{ marginTop: -1 }}
-            >
-              ‹
-            </Text>
-          </Pressable>
-          <Text className="text-white text-xl font-bold">New topic</Text>
-        </View>
-      </View>
+      <ScreenHeader title="New topic" />
 
       <ScrollView
         className="flex-1 bg-slate-50"
@@ -230,6 +245,42 @@ export default function NewTopicScreen() {
           ) : null}
         </View>
 
+        {/* Question types */}
+        <View className="mb-8">
+          <Text className="text-sm font-semibold text-slate-700 mb-3">
+            Question types
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {FORMAT_OPTIONS.map((opt) => {
+              const active = selectedFormats.has(opt.value);
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => toggleFormat(opt.value)}
+                  className={`rounded-full px-4 py-2 border ${
+                    active
+                      ? "bg-indigo-600 border-indigo-600"
+                      : "bg-white border-slate-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium ${
+                      active ? "text-white" : "text-slate-600"
+                    }`}
+                  >
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {errors.formats ? (
+            <Text className="text-xs text-red-500 mt-2 ml-1">
+              {errors.formats}
+            </Text>
+          ) : null}
+        </View>
+
         {/* Submit */}
         <Pressable
           className={`rounded-2xl py-4 items-center ${
@@ -242,9 +293,7 @@ export default function NewTopicScreen() {
             <ActivityIndicator size="small" color="white" />
           ) : (
             <Text className="text-white text-base font-semibold">
-              {levelMode === "manual"
-                ? "Create topic"
-                : "Create & start diagnostic"}
+              Generate questions
             </Text>
           )}
         </Pressable>

@@ -21,15 +21,33 @@ Return a JSON array of 20 objects. Each object must have these exact keys:
 - "reasoning": one sentence explaining why it is correct (string)
 - "difficulty": integer 1–5
 
-Distribution: ~10 mcq, ~6 written, ~4 fill_blank.
+{fmt_instruction}
 Difficulty: questions 1–5 difficulty 1–2, questions 6–14 difficulty 3, questions 15–20 difficulty 4–5.
 Tailor difficulty and content to the student's level context above.
 Return only the JSON array with no other text.
 """
 
 
-def generate_batch(title: str, domain: str, level_summary: str) -> list[dict]:
-    prompt = _PROMPT.format(title=title, domain=domain, level_summary=level_summary)
+def _format_instruction(formats: list[str]) -> str:
+    if len(formats) == 1:
+        return f'All questions must use format "{formats[0]}".'
+    listed = ", ".join(f'"{f}"' for f in formats)
+    return f"Only use these formats: {listed}. Distribute them roughly evenly."
+
+
+def generate_batch(
+    title: str,
+    domain: str,
+    level_summary: str,
+    question_formats: list[str] | None = None,
+) -> list[dict]:
+    formats = question_formats or ["mcq", "written", "fill_blank"]
+    prompt = _PROMPT.format(
+        title=title,
+        domain=domain,
+        level_summary=level_summary,
+        fmt_instruction=_format_instruction(formats),
+    )
 
     response = _client.models.generate_content(
         model=settings.gemini_model,
