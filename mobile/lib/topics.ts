@@ -70,10 +70,17 @@ export enum TopicLevel {
   Advanced = "advanced",
 }
 
+export enum QuestionFormat {
+  Mcq = "mcq",
+  Written = "written",
+  FillBlank = "fill_blank",
+}
+
 export async function createTopic(
   title: string,
   domain: string,
   initial_level?: TopicLevel,
+  question_formats?: QuestionFormat[],
 ): Promise<NewTopic> {
   const { data } = await api.post<{ topic: NewTopic }>(
     "/api/topics",
@@ -81,6 +88,7 @@ export async function createTopic(
       title,
       domain,
       ...(initial_level ? { initial_level } : {}),
+      ...(question_formats ? { question_formats } : {}),
     },
     { timeout: initial_level ? 120_000 : 10_000 },
   );

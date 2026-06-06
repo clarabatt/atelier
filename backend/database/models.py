@@ -69,6 +69,10 @@ class Topic(SQLModel, table=True):
     domain: str
     ai_level_summary: Optional[str] = None
     status: TopicStatus = Field(default=TopicStatus.not_started)
+    question_formats: List[str] = Field(
+        default_factory=lambda: ["mcq", "written", "fill_blank"],
+        sa_column=Column(JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: Optional[User] = Relationship(back_populates="topics")
