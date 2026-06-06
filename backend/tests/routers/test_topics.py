@@ -492,3 +492,70 @@ def test_batch_creation_transitions_topic_to_active(client: TestClient, session:
 
     persisted = TopicRepository(session).get_by_id(topic.id)
     assert persisted.status.value == "active"
+
+
+# ---------------------------------------------------------------------------
+# question_formats — AT-0004
+# ---------------------------------------------------------------------------
+
+def test_create_topic_with_custom_formats_persists_to_db(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math", "question_formats": ["mcq"]},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 201
+    topic_id = r.json()["topic"]["id"]
+    persisted = TopicRepository(session).get_by_id(uuid.UUID(topic_id))
+    assert persisted.question_formats == ["mcq"]
+
+
+def test_create_topic_without_formats_defaults_to_all_three(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math"},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 201
+    topic_id = r.json()["topic"]["id"]
+    persisted = TopicRepository(session).get_by_id(uuid.UUID(topic_id))
+    assert persisted.question_formats == ["mcq", "written", "fill_blank"]
+
+
+def test_create_topic_empty_formats_returns_422(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+
+    r = client.post(
+        "/api/topics",
+        json={"title": "Algebra", "domain": "Math", "question_formats": []},
+        headers=_auth(session_cookie, user.id),
+    )
+
+    assert r.status_code == 422
+
+
+def test_batch_generation_passes_topic_formats_to_generate_batch(
+    client: TestClient, session: Session, session_cookie
+) -> None:
+    user = UserFactory.create(session)
+    topic = TopicFactory.create(
+        session, user.id, ai_level_summary="beginner level", question_formats=["fill_blank"]
+    )
+
+    with patch("backend.routers.topics.generate_batch", return_value=_fake_questions()) as mock_gen:
+        r = client.post(f"/api/topics/{topic.id}/batches", headers=_auth(session_cookie, user.id))
+
+    assert r.status_code == 201
+    assert mock_gen.call_args.args[3] == ["fill_blank"]
