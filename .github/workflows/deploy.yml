@@ -61,7 +61,7 @@ jobs:
             --region=${{ secrets.GCP_REGION }} \
             --project=${{ secrets.GCP_PROJECT }} \
             --service-account=$RUNTIME_SA \
-            --add-cloudsql-instances=${{ secrets.CLOUD_SQL_INSTANCE }} \
+            --set-cloudsql-instances=${{ secrets.CLOUD_SQL_INSTANCE }} \
             --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --command="uv" \
             --args="run,alembic,upgrade,head" \
