@@ -47,10 +47,10 @@ jobs:
               SECRET_KEY=${{ secrets.SECRET_KEY }},\
               GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},\
               GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},\
-              GOOGLE_REDIRECT_URI=PLACEHOLDER,\
+              GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }},\
               MOBILE_REDIRECT_URI=atelier://callback,\
               GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},\
-              FRONTEND_URL=PLACEHOLDER,\
+              FRONTEND_URL=${{ secrets.FRONTEND_URL }},\
               EXTRA_ORIGINS=atelier://" \
             --quiet
 
