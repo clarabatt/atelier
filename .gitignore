@@ -23,3 +23,5 @@ frontend/.vite/
 # OS
 .DS_Store
 .local-uploads/
+
+key.json

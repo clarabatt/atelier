@@ -9,6 +9,11 @@ jobs:
     name: Build & Deploy
     runs-on: ubuntu-latest
 
+    env:
+      IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/atelier/atelier:latest
+      SERVICE_NAME: atelier-api
+      RUNTIME_SA: atelier-runtime@${{ secrets.GCP_PROJECT }}.iam.gserviceaccount.com
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,23 +30,43 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -t ${{ secrets.IMAGE }} .
-          docker push ${{ secrets.IMAGE }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ secrets.SERVICE_NAME }} \
-            --image=${{ secrets.IMAGE }} \
+          gcloud run deploy $SERVICE_NAME \
+            --image=$IMAGE \
             --region=${{ secrets.GCP_REGION }} \
-            --update-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --service-account=$RUNTIME_SA \
+            --allow-unauthenticated \
+            --add-cloudsql-instances=${{ secrets.CLOUD_SQL_INSTANCE }} \
+            --set-env-vars="\
+              DATABASE_URL=${{ secrets.DATABASE_URL }},\
+              SECRET_KEY=${{ secrets.SECRET_KEY }},\
+              GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},\
+              GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},\
+              GOOGLE_REDIRECT_URI=PLACEHOLDER,\
+              MOBILE_REDIRECT_URI=atelier://callback,\
+              GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},\
+              FRONTEND_URL=PLACEHOLDER,\
+              EXTRA_ORIGINS=atelier://" \
             --quiet
 
       - name: Run migrations
         run: |
-          gcloud run jobs update atelier-migrate \
-            --image=${{ secrets.IMAGE }} \
+          gcloud run jobs deploy atelier-migrate \
+            --image=$IMAGE \
             --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT }} \
+            --service-account=$RUNTIME_SA \
+            --add-cloudsql-instances=${{ secrets.CLOUD_SQL_INSTANCE }} \
+            --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --command="uv" \
+            --args="run,alembic,upgrade,head" \
             --quiet
           gcloud run jobs execute atelier-migrate \
             --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT }} \
             --wait
